@@ -2,7 +2,8 @@ spikingjelly_alias
 *.csv
 *.aedat
 *.npz
-data/*.txt
+#Quitar archivos .txt dentro de subcarpetas de data
+data/**/*.txt 
 *.DS_Store
 *.rar
 *.gz
