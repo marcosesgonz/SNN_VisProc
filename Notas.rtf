@@ -1,0 +1,111 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2709
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 HelveticaNeue-Bold;\f1\fnil\fcharset0 HelveticaNeue-Italic;\f2\fnil\fcharset0 HelveticaNeue;
+}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid1\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid1}
+{\list\listtemplateid2\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid101\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid2}
+{\list\listtemplateid3\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid201\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid3}
+{\list\listtemplateid4\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat2\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid301\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid4}
+{\list\listtemplateid5\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid401\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid5}
+{\list\listtemplateid6\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid501\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid6}
+{\list\listtemplateid7\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid601\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid7}
+{\list\listtemplateid8\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid701\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid8}}
+{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}{\listoverride\listid3\listoverridecount0\ls3}{\listoverride\listid4\listoverridecount0\ls4}{\listoverride\listid5\listoverridecount0\ls5}{\listoverride\listid6\listoverridecount0\ls6}{\listoverride\listid7\listoverridecount0\ls7}{\listoverride\listid8\listoverridecount0\ls8}}
+\paperw11900\paperh16840\margl1440\margr1440\vieww29740\viewh18600\viewkind0
+\deftab560
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs40 \cf0 Modelo de neuronas(
+\f1\i\b0 Models Developed for Spiking Neural Networks 2022)
+\f0\i0\b \
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f2\b0\fs26 \cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls1\ilvl0\cf0 {\listtext	0.	}Leaky Integrate and FIre: basado en el\'e9ctronica. Representa a la neurona como la combinaci\'f3n de una resistencia y un capacitor. Cuando la neurona se activa, el capacitor se descarga y vuelve a su estado inicial.\
+{\listtext	0.	}Spike-response Model: Los par\'e1metros del modelo son funciones del tiempo, es una versi\'f3n generalizada de LIf.\
+{\listtext	0.	}Izhikevich Model: Modelado m\'e1s parecido al de las neuronas corticales pero con la eficiencia computacional del integrate and fire.\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs40 \cf0 Codificaci\'f3n neuronal(
+\f1\i\b0 Models Developed for Spiking Neural Networks 2022)
+\f0\i0\b \
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f2\b0\fs26 \cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls2\ilvl0\cf0 {\listtext	0.	}Rate coding: La informaci\'f3n se transmite por la frecuencia de disparo de las neuronas. El proceso de Poisson puede ser usado para modelar este esquema\
+{\listtext	0.	}Temporal coding: Un ventana larga de tiempo se necesita para el rate coding. En este caso es el tiempo pasado hasta el siguiente pulso el que almacena la informaci\'f3n. Una forma de esta codificaci\'f3n es que valores altos se traducir\'e1n como tiempos m\'e1s cortos al siguiente pulso. Esta codificaci\'f3n es m\'e1s r\'e1pida y escasa de pulsos\
+{\listtext	0.	}Phase coding: Se codifica la informaci\'f3n en patrones de disparo que tienen fases correlacionadas con ritmos de oscilaci\'f3n de fondo generados internamente. En esta codificaci\'f3n las neuronas disparan en diferentes fases, y la fase se utiliza para transmitir informaci\'f3n.\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs40 \cf0 \
+Algoritmos de aprendizaje
+\f1\i\b0 (Recent Advances and New Frontiers in Spiking Neural Networks 2022)
+\f0\i0\b \
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f2\b0\fs26 \cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls3\ilvl0\cf0 {\listtext	0.	}Basados en Brain Science(BS) intentan optimizar la plasticidad de las neuronas en micro-(a nivel de cada neurona) ,meso-(grupo de neuronas),macro-scala(todo el conjunto de neuronas):\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 	Microescala: Spike-timing-dependent plasticity(STDP) y variantes (symmetric-STDP, Reward-STDP \'f3 tambi\'e9n conocido como R-STDP):\
+		STDP(Sacado de 
+\f1\i Models Developed for Spiking Neural Networks,2022
+\f2\i0 ):Although deep neural networks can achieve high accuracies with backpropagation [4]\'96[6], [29], their 			convergence 	is slow, and they need a large number of labeled 		examples and energy in order to learn. But humans are able to learn with a few examples and without explicit 			labels and a small amount of energy. In the brain, learning occurs through changes in the strength of the connection between 			neurons. This change in the strength of 					connections is called synaptic plasticity [30]. In STDP, when a pre-synaptic neuron fires before a post-synaptic neuron, their connection is strengthened, and when a pre-						synaptic neuron fires after a post-synaptic neuron, their connection is weakened.\
+	\
+	Mesoescala: lateral inhibition [Zenke et al., 2015], Self-backpropagation (SBP) [Zhang et al., 2021b], homeostatic control among multiple neurons, etc\
+	Macroescala(no hay equivalente con BP por motivos biol\'f3gicos): To make BP more biological like and energy-efficient, some transformative algorithms for BP have emerged. For 		example, target propagation [Bengio, 2014], feedback alignment [Lillicrap et al., 2016], direct random target propagation [Frenkel et al., 2021], etc., solve the weight transport 		problem by implementing direct gradient transfer in the backward process with random matrices\
+\
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls4\ilvl0\cf0 {\listtext	0.	}Basados en BP: mainly including pseudo-BP [Zenke and Ganguli, 2018], DNNs-converted SNNs [Cao et al., 2015], etc. Since the spike signal is not differentiable, the direct application of gradient-based BP is difficult. The key feature of the pseudoBP is replacing the non-differential parts of spiking neurons during BP with a predefined gradient number.\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs40 \cf0 \
+Frameworks SNN\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+
+\f2\b0\fs26 \cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls5\ilvl0
+\fs24 \cf0 {\listtext	\uc0\u8259 	}
+\fs26 Brian2: Escrito desde cero, no se basa en pytorch. Tiene una gu\'eda extensa y completa, deja al usuario el uso de ecuaciones (con unidades) para definir el modelo de neuronas etc. Curva de aprendizaje m\'e1s dura que otros como spyking jelly basados en pytorch.\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls6\ilvl0
+\fs24 \cf0 {\listtext	\uc0\u8259 	}
+\fs26 Spyker(mencionado en Models Developed for Spiking Neural Networks, 2022): It uses highly optimized low-level backends on both CPU and GPU devices, has both C++ and Python interfaces, is multiple times faster compared to its predecessors, and has the ability to be integrated with commonly used tools like PyTorch and Numpy. This library supports rank order coding, rate coding, integrate-and-fire neurons, STDP, R-STDP, and backpropagation (experimental). No he encontrado documentaci\'f3n para su uso en Python.\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls7\ilvl0
+\fs24 \cf0 {\listtext	\uc0\u8259 	}
+\fs26 Norse: Basado en pytorch, modelos de neuronas lif y variantes... no tan amplio como Brian2. Solo se puede optimizar con los algoritmos cl\'e1sicos de Pytorch de Autograd and backprop gracias al SuperSpike surrogate partial derivative for some activation function (sigma). No parece permitir STDP, etc\'e9tera.\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls8\ilvl0
+\fs24 \cf0 {\listtext	\uc0\u8259 	}
+\fs26 Spyking Jelly: Basado en pytorch y  documentaci\'f3n m\'e1s completa de todas. Modelo de neuronas lif, puede usar tanto STDP como algoritmos cl\'e1sicos como SGD(incluso los dos a la vez). Permite transfer learning de ANN a SNN.  Curva de aprendizaje \
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs40 \cf0 \
+SNNvsANNs:\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+
+\f2\b0\fs26 \cf0 \
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \ul \ulc0 A nivel de hardware\ulnone  (
+\f1\i Comparison of Artificial and Spiking Neural Networks on Digital Hardware
+\f2\i0 ), muestra que la eficiencia energ\'e9tica de la activaci\'f3n de una neurona en el modelo SNN es mayor que el de una ANN. Sin embargo, la activaci\'f3n de una neurona en un modelo SNN se da por cada spike que ocurra. \ul Esto puede conducir a que, a n\'fameros altos de spikes (por ejemplos en codificaciones basadas en frecuencias), el consumo de una red SNN sea mayor al que de una ANN\ulnone . (Pruebas realizadas en la plataforma de procesado basa en ARM y optimizado a SNNs, SpiNNaker2, con 10 millones n\'facleos)\
+\
+\ul A nivel performance\ulnone (
+\f1\i A Performance Comparison of Artificial Neural Networks and Spiking Neural Networks
+\f2\i0 ), para la clasificaci\'f3n de MNIST entrenaron LeNet-5 y su equivalente en ANN con neuronas LIF y backpropagation utilizando distribuciones de probabilidad(no especifican encoding). Se realizaron 50 entrenamientos con inicializaci\'f3n de pesos aleatorias distintas, se comprob\'f3 con uso de test estad\'edsticos que el accuracy llegado con el modelo SNN era mayor que con el ANN (a pesar de usar hardware von Neumann y no neurom\'f3rfico, que ser\'eda el ideal para SNN). Sin embargo, en el mismo art\'edculo se menciona que este outperforming se da para un modelo ya anticuado como LeNet-5. Para modelos m\'e1s novedosos, los SNN superan en t\'e9rminos de eficiencia a sus equivalentes ANN pero no en accuracy, lo achacan a m\'e9todos de optimizaci\'f3n limitadas para SNN.}
