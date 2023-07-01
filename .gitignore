@@ -3,5 +3,7 @@ spikingjelly_alias
 *.aedat
 *.npz
 data/*.txt
+*.DS_Store
 *.rar
 *.gz
+data/Actions_Dataset
