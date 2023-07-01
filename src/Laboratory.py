@@ -101,10 +101,11 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         batch_size=batch_size,
         learning_rate=lr,
         dataset=relative_root,
-        architecture="DVS_SNN")
+        architecture=net_name,
+        )
     
     project_ref = input('Introducir el proyecto(fijarse en los que ya hay en wandb):')
-    name_experim = input('Introducir el nombre concreto de este experimento(CUIDADO con sobreescribir):')
+    name_experim = input('Introducir el nombre concreto de esta ejecución(CUIDADO con sobreescribir¿?):')
 
     with wandb.init(project = project_ref, name=name_experim,config=hyperparameters): 
         if device == 'cuda':
