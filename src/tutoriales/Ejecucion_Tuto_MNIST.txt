@@ -1,0 +1,59 @@
+(tfm) marcosesquivelgonzalez@MacBook-Pro-de-Marcos ~ % python3 /Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/spikingjelly/activation_based/examples/lif_fc_mnist.py
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+SNN(
+  (layer): Sequential(
+    (0): Flatten(start_dim=1, end_dim=-1, step_mode=s)
+    (1): Linear(in_features=784, out_features=10, bias=False)
+    (2): LIFNode(
+      v_threshold=1.0, v_reset=0.0, detach_reset=False, step_mode=s, backend=torch, tau=2.0
+      (surrogate_function): ATan(alpha=2.0, spiking=True)
+    )
+  )
+)
+datasets cargados
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =0, train_loss = 0.0275, train_acc = 0.8692, test_loss = 0.0195, test_acc = 0.9125, max_test_acc = 0.9125
+train speed = 368.9898 images/s, test speed = 711.5250 images/s
+escape time = 2023-06-06 05:10:11
+
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =1, train_loss = 0.0188, train_acc = 0.9100, test_loss = 0.0175, test_acc = 0.9144, max_test_acc = 0.9144
+train speed = 369.3214 images/s, test speed = 694.4772 images/s
+escape time = 2023-06-06 05:10:31
+
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =2, train_loss = 0.0175, train_acc = 0.9155, test_loss = 0.0167, test_acc = 0.9192, max_test_acc = 0.9192
+train speed = 379.6254 images/s, test speed = 720.2731 images/s
+escape time = 2023-06-06 05:02:23
+
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =3, train_loss = 0.0168, train_acc = 0.9185, test_loss = 0.0161, test_acc = 0.9202, max_test_acc = 0.9202
+train speed = 380.3747 images/s, test speed = 715.5849 images/s
+escape time = 2023-06-06 05:02:02
+
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =4, train_loss = 0.0164, train_acc = 0.9204, test_loss = 0.0158, test_acc = 0.9235, max_test_acc = 0.9235
+train speed = 373.6500 images/s, test speed = 718.7330 images/s
+escape time = 2023-06-06 05:06:31
+
+Namespace(T=100, device='mps:0', b=64, epochs=100, j=4, data_dir=None, out_dir='./logs', resume=None, amp=False, opt='adam', momentum=0.9, lr=0.001, tau=2.0)
+./logs/T100_b64_adam_lr0.001
+epoch =5, train_loss = 0.0161, train_acc = 0.9214, test_loss = 0.0158, test_acc = 0.9228, max_test_acc = 0.9235
+train speed = 382.6769 images/s, test speed = 722.0971 images/s
+escape time = 2023-06-06 05:00:21
+
+^CTraceback (most recent call last):
+  File "/Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/spikingjelly/activation_based/examples/lif_fc_mnist.py", line 280, in <module>
+    main()
+  File "/Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/spikingjelly/activation_based/examples/lif_fc_mnist.py", line 181, in main
+    loss.backward()
+  File "/Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/torch/_tensor.py", line 487, in backward
+    torch.autograd.backward(
+  File "/Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/torch/autograd/__init__.py", line 200, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+KeyboardInterrupt

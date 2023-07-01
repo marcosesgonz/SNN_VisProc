@@ -1,0 +1,2 @@
+# epochs 30, batch_size 8
+/Users/marcosesquivelgonzalez/pyenviroments/tfm/lib/python3.11/site-packages/ipykernel_launcher.py --ip=127.0.0.1 --stdin=9013 --control=9011 --hb=9010 --Session.signature_scheme="hmac-sha256" --Session.key=b"2c0dd086-c63f-4ca5-9108-11d94b9984b3" --shell=9012 --transport="tcp" --iopub=9014 --f=/Users/marcosesquivelgonzalez/Library/Jupyter/runtime/kernel-v2-10890RWRQWlt3KMfi.json

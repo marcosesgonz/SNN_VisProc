@@ -1,0 +1,2 @@
+# epochs 30, batch_size 8
+/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/Projects/Experiments_inpy.py

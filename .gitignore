@@ -1,0 +1,7 @@
+spikingjelly_alias
+*.csv
+*.aedat
+*.npz
+data/*.txt
+*.rar
+*.gz

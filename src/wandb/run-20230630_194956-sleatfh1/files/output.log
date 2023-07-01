@@ -1,0 +1,4 @@
+Instancias de train:  896
+Instancias de test:  225
+/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/Projects/Experiments_DVSNet.py:130: UserWarning: Using a target size (torch.Size([8, 19])) that is different to the input size (torch.Size([8, 11])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  loss = F.mse_loss(out_fr, label_onehot)
