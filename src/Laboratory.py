@@ -134,6 +134,7 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum = 0.9)
         
+        #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
 
         max_test_acc = -1
