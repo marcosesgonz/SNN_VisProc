@@ -520,3 +520,235 @@ class DVSDailyActions(sjds.NeuromorphicDatasetFolder):
         :rtype: tuple
         '''
         return 128, 128
+    
+
+
+class DVSActionRecog(sjds.NeuromorphicDatasetFolder):
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            data_type: str = 'event',
+            frames_number: int = None,
+            split_by: str = None,
+            duration: int = None,
+            custom_integrate_function: Callable = None,
+            custom_integrated_frames_dir_name: str = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+    ) -> None:
+        """
+        The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
+
+        Refer to :class:`spikingjelly.datasets.NeuromorphicDatasetFolder` for more details about params information.
+
+
+        .. admonition:: Note
+            :class: note
+
+            There are 1121 samples. See that they are all stored in the train folder.
+
+            .. code-block:: python
+
+                from spikingjelly.datasets import dvs128_gesture
+
+                src_root = os.path.dirname(__file__)
+                data_root = os.path.join(os.path.dirname(src_root),'data')
+                data_animals = os.path.join(data_root,'SLAnimals_Dataset')
+                data_set = DVSAnimals(data_animals,train=True, data_type='frame', frames_number=T, split_by=splitby)
+                labels = [sample[1] for sample in data_set]
+                print('Posible labels:',np.unique(labels))
+                train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed) 
+
+            
+            The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
+
+        """
+        assert train is True
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+    @staticmethod
+    def resource_url_md5() -> list:
+        '''
+        :return: A list ``url`` that ``url[i]`` is a tuple, which contains the i-th file's name, download link, and MD5
+        :rtype: list
+        '''
+        url = 'https://tongjieducn-my.sharepoint.com/personal/ziyang_tongji_edu_cn/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fziyang%5Ftongji%5Fedu%5Fcn%2FDocuments%2FPAFBenchmark%2FAction%20Recognition&ga=1'
+        #No files in download folder. The files are put it directly in extract folder
+        return [] 
+
+    @staticmethod
+    def downloadable() -> bool:
+        '''
+        :return: Whether the dataset can be directly downloaded by python codes. If not, the user have to download it manually
+        :rtype: bool
+        '''
+        return False
+
+    @staticmethod
+    def extract_downloaded_files(download_root: str, extract_root: str):
+        '''
+        :param download_root: Root directory path which saves downloaded dataset files
+        :type download_root: str
+        :param extract_root: Root directory path which saves extracted files from downloaded files
+        :type extract_root: str
+        :return: None
+
+        This function defines how to extract download files.
+        '''
+        #fpath = os.path.join(download_root, 'DvsGesture.tar.gz')
+        print(f'Extract it manually in .../extract/ActionRecognition folder. This folder contains subfolders for each class with one .aedat file per sample.')
+        
+    @staticmethod
+    def load_origin_data(file_name: str, startTime = 0, numEvents = 1e10) -> Dict:
+        """ DESCRIPTION: This function reads a given aedat file and converts it into four lists indicating 
+                     timestamps, x-coordinates, y-coordinates and polarities of the event stream. 
+    
+        Args:
+            file: the path of the file to be read, including extension (str).
+            numEvents: the maximum number of events allowed to be read (int, default value=1e10).
+            startTime: the start event timestamp (in microseconds) where the conversion process begins (int, default value=0).
+
+        Return:
+            A dictionary with:
+                t: list of timestamps in microseconds.
+                x: list of x-coordinates in pixels.
+                y: list of y-coordinates in pixels.`
+                p: list of polarities (0: on -> off, 1: off -> on).       
+        """
+        sizeX = 346
+        sizeY = 260
+        x0 = 0
+        y0 = 0
+        x1 = sizeX
+        y1 = sizeY
+
+        triggerevent = int('400', 16)
+        polmask = int('800', 16)
+        xmask = int('003FF000', 16)
+        ymask = int('7FC00000', 16)
+        typemask = int('80000000', 16)
+        typedvs = int('00', 16)
+        xshift = 12
+        yshift = 22
+        polshift = 11
+        x = []
+        y = []
+        ts = []
+        pol = []
+        
+        length = 0
+        aerdatafh = open(file_name, 'rb')
+        k = 0
+        p = 0
+        statinfo = os.stat(file_name)
+        if length == 0:
+            length = statinfo.st_size
+            
+        lt = aerdatafh.readline()
+        while lt and str(lt)[2] == "#":
+            p += len(lt)
+            k += 1
+            lt = aerdatafh.readline()
+            continue
+
+        aerdatafh.seek(p)
+        tmp = aerdatafh.read(8)
+        p += 8
+        while p < length:
+            ad, tm = struct.unpack_from('>II', tmp)
+            ad = abs(ad)
+            if tm >= startTime:
+                if (ad & typemask) == typedvs:
+                    xo = sizeX - 1 - float((ad & xmask) >> xshift)
+                    yo = float((ad & ymask) >> yshift)
+                    polo = 1 - float((ad & polmask) >> polshift)
+                    if xo >= x0 and xo < x1 and yo >= y0 and yo < y1:
+                        x.append(xo)
+                        y.append(yo)
+                        pol.append(polo)
+                        ts.append(tm)
+            aerdatafh.seek(p)
+            tmp = aerdatafh.read(8)
+            p += 8
+
+
+        events_dict = dict()
+        events_dict['x'] = np.array(x)
+        events_dict['y'] = np.array(y)
+        events_dict['t'] = np.array(ts)
+        events_dict['p'] = np.array(pol) 
+
+        return  events_dict                
+        
+                                           
+
+    @staticmethod
+    def split_aedat_files_to_np(fname: str, aedat_file: str, output_dir: str):
+        """
+        fname: parte inicial del nombre que le pondré al archivo .npz
+        aedat_file: fichero aedat donde se leen los eventos
+        output_dir: archivo raiz donde se irán almacenando los .npz
+        """
+        events = DVSActionRecog.load_origin_data(aedat_file)
+        #print(f'Start to split [{aedat_file}] to samples.')
+        #print('Tiempo de eventos: ',events['t'])
+
+        file_name = os.path.join(output_dir, f'{fname}.npz')
+        np_savez(file_name,
+                    t=events['t'],
+                    x=events['x'],
+                    y=events['y'],
+                    p=events['p']
+                    )
+        print(f'[{file_name}] saved.')
+            
+
+    @staticmethod
+    def create_events_np_files(extract_root: str, events_np_root: str):
+        '''
+        :param extract_root: Root directory path which saves extracted files from downloaded files
+        :type extract_root: str
+        :param events_np_root: Root directory path which saves events files in the ``npz`` format
+        :type events_np_root:
+        :return: None
+
+        This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
+        '''
+        aedats_directories = os.path.join(extract_root, 'ActionRecognition')
+        data_dir = os.path.join(events_np_root, 'train')
+        os.mkdir(data_dir)
+        print(f'Mkdir {data_dir}.')
+        #subfolders name corresponds to the labels
+        labels = [it.name for it in os.scandir(aedats_directories) if it.is_dir()] 
+        for label in labels:
+            os.mkdir(os.path.join(data_dir, label))
+        print(f'Mkdir {os.listdir(data_dir)} in [{data_dir}].')
+
+        # use multi-thread to accelerate
+        t_ckp = time.time()
+        with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
+            print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+
+            for label in labels:
+                aedat_dir = os.path.join(aedats_directories,label)
+                output_dir = os.path.join(data_dir, label)
+                for fname in os.listdir(aedat_dir):
+                    if fname.endswith('.aedat'):
+                        aedat_file = os.path.join(aedat_dir, fname)
+                        #File name without .aedat
+                        fname = os.path.splitext(fname)[0]
+                        tpe.submit(DVSActionRecog.split_aedat_files_to_np, fname, aedat_file, output_dir)
+
+
+        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+        print(f'All aedat files have been split to samples and saved into [{data_dir}].')
+
+    @staticmethod
+    def get_H_W() -> Tuple:
+        '''
+        :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W` is the weight of the data.
+            For example, this function returns ``(346, 260)`` for the DAVIS346redcolor.
+            https://www.frontiersin.org/articles/10.3389/fnbot.2019.00038/full
+        :rtype: tuple
+        '''
+        return 260, 346

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import wandb
 import random
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
-from Datasets import DVSAnimals, DVSDailyActions
+from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog
 from spikingjelly.datasets.dvs128_gesture import DVS128Gesture
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
@@ -39,6 +39,8 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         data_set = DVSAnimals(root = inp_data, train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     elif relative_root == 'DVS_DailyAction_dataset':
         data_set = DVSDailyActions(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
+    elif relative_root == 'DVS_ActionRecog_dataset':
+        data_set = DVSActionRecog(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
   
@@ -50,8 +52,9 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed)
     else:
         nclasses_ = len(train_set.classes) 
-    print('Número de clases: ',nclasses_)
 
+    train_size_ = len(train_set)
+    test_size_ = len(test_set)
 
     #Arquitectura de red que se va a usar
     if net_name == 'DVSG_net':
@@ -68,6 +71,8 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     hyperparameters = dict(epochs=epochs,
         time_step = T,
         nclasses = nclasses_,
+        train_size = train_size_,
+        test_size = test_size_,
         labels = data_set.class_to_idx,
         batch_size=batch_size,
         learning_rate=lr,
@@ -102,11 +107,9 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
             pin_memory=True
         )
 
-        print('Instancias de train: ',len(train_set)) #Son 1176 instancias (DVSGesture)
-        print('Instancias de test: ',len(test_set))   #Son 288 instancias de test (DVSGesture) (e.d. 80% train y 20% test)
-
+        print('Número de clases: ',nclasses_)
+        print('Nº instancias train/test:', train_size_,'/', test_size_)
         #Optimizamos con SGD
-        
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum = 0.9)
         
         #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
