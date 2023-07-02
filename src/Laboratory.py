@@ -67,7 +67,8 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     wandb.login()
     hyperparameters = dict(epochs=epochs,
         time_step = T,
-        classes=nclasses_,
+        nclasses = nclasses_,
+        labels = data_set.class_to_idx,
         batch_size=batch_size,
         learning_rate=lr,
         dataset=relative_root,
