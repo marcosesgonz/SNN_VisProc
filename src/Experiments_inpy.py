@@ -10,7 +10,7 @@ data_dailyactions = os.path.join(data_root,'DVS_DailyAction_dataset')
 
 if __name__ == '__main__':
 
-    dataset = input('Dataset to use(Animals/Gesture): ')
+    dataset = input('Dataset to use(Animals/Gesture/DailyAct): ')
     if dataset == 'Animals':
         dataset = data_animals
     if dataset == 'Gesture':

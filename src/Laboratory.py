@@ -41,14 +41,18 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         data_set = DVSDailyActions(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
+  
 
-    #In case the dataset has not been split yet:
+    #In case the dataset has not been split yet: (Also obtain number of classes)
     if test_set is None:
+        nclasses_ = len(data_set.classes)
         labels = [sample[1] for sample in data_set]
         train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed)
-    #Número de clases
-    nclasses_ = len(train_set.classes) 
+    else:
+        nclasses_ = len(train_set.classes) 
     print('Número de clases: ',nclasses_)
+
+
     #Arquitectura de red que se va a usar
     if net_name == 'DVSG_net':
         net = myDVSGestureNet(channels=128, output_size = nclasses_, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
