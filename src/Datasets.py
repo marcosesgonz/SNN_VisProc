@@ -1,6 +1,7 @@
 from typing import Callable, Dict, Optional, Tuple
 import numpy as np
 from spikingjelly import datasets as sjds
+from torchvision.datasets import DatasetFolder
 from torchvision.datasets.utils import extract_archive
 import os
 import multiprocessing
@@ -15,7 +16,7 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
     def __init__(
             self,
             root: str,
-            train: bool = None,
+            train: bool = True,
             data_type: str = 'event',
             frames_number: int = None,
             split_by: str = None,
@@ -26,7 +27,7 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
             target_transform: Optional[Callable] = None,
     ) -> None:
         """
-        The DVS128 Gesture dataset, which is proposed by `A Low Power, Fully Event-Based Gesture Recognition System <https://openaccess.thecvf.com/content_cvpr_2017/html/Amir_A_Low_Power_CVPR_2017_paper.html>`_.
+        The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
 
         Refer to :class:`spikingjelly.datasets.NeuromorphicDatasetFolder` for more details about params information.
 
@@ -34,113 +35,26 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
         .. admonition:: Note
             :class: note
 
-            In SpikingJelly, there are 1176 train samples and 288 test samples. The total samples number is 1464.
+            There are 1121 samples. See that they are all stored in the train folder.
 
             .. code-block:: python
 
                 from spikingjelly.datasets import dvs128_gesture
 
-                data_dir = 'D:/datasets/DVS128Gesture'
-                train_set = dvs128_gesture.DVS128Gesture(data_dir, train=True)
-                test_set = dvs128_gesture.DVS128Gesture(data_dir, train=False)
-                print(f'train samples = {train_set.__len__()}, test samples = {test_set.__len__()}')
-                print(f'total samples = {train_set.__len__() + test_set.__len__()}')
+                src_root = os.path.dirname(__file__)
+                data_root = os.path.join(os.path.dirname(src_root),'data')
+                data_animals = os.path.join(data_root,'SLAnimals_Dataset')
+                data_set = DVSAnimals(data_animals,train=True, data_type='frame', frames_number=T, split_by=splitby)
+                labels = [sample[1] for sample in data_set]
+                print('Posible labels:',np.unique(labels))
+                train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed) 
 
-                # train samples = 1176, test samples = 288
-                # total samples = 1464
-
-
-            While from the origin paper, `the DvsGesture dataset comprises 1342 instances of a set of 11 hand and arm \
-            gestures`. The difference may be caused by different pre-processing methods.
-
-            `snnTorch <https://snntorch.readthedocs.io/>`_ have the same numbers with SpikingJelly:
-
-            .. code-block:: python
-
-                from snntorch.spikevision import spikedata
-
-                train_set = spikedata.DVSGesture("D:/datasets/DVS128Gesture/temp2", train=True, num_steps=500, dt=1000)
-                test_set = spikedata.DVSGesture("D:/datasets/DVS128Gesture/temp2", train=False, num_steps=1800, dt=1000)
-                print(f'train samples = {train_set.__len__()}, test samples = {test_set.__len__()}')
-                print(f'total samples = {train_set.__len__() + test_set.__len__()}')
-
-                # train samples = 1176, test samples = 288
-                # total samples = 1464
-
-
-            But `tonic <https://tonic.readthedocs.io/>`_ has different numbers, which are close to `1342`:
-
-            .. code-block:: python
-
-                import tonic
-
-                train_set = tonic.datasets.DVSGesture(save_to='D:/datasets/DVS128Gesture/temp', train=True)
-                test_set = tonic.datasets.DVSGesture(save_to='D:/datasets/DVS128Gesture/temp', train=False)
-                print(f'train samples = {train_set.__len__()}, test samples = {test_set.__len__()}')
-                print(f'total samples = {train_set.__len__() + test_set.__len__()}')
-
-                # train samples = 1077, test samples = 264
-                # total samples = 1341
-
-
-            Here we show how 1176 train samples and 288 test samples are got in SpikingJelly.
-
-            The origin dataset is split to train and test set by ``trials_to_train.txt`` and ``trials_to_test.txt``.
-
-
-            .. code-block:: shell
-
-                trials_to_train.txt:
-
-                    user01_fluorescent.aedat
-                    user01_fluorescent_led.aedat
-                    ...
-                    user23_lab.aedat
-                    user23_led.aedat
-
-                trials_to_test.txt:
-
-                    user24_fluorescent.aedat
-                    user24_fluorescent_led.aedat
-                    ...
-                    user29_led.aedat
-                    user29_natural.aedat
-
-            SpikingJelly will read the txt file and get the aedat file name like ``user01_fluorescent.aedat``. The corresponding \
-            label file name will be regarded as ``user01_fluorescent_labels.csv``.
-
-            .. code-block:: shell
-
-                user01_fluorescent_labels.csv:
-
-                    class	startTime_usec	endTime_usec
-                    1	80048239	85092709
-                    2	89431170	95231007
-                    3	95938861	103200075
-                    4	114845417	123499505
-                    5	124344363	131742581
-                    6	133660637	141880879
-                    7	142360393	149138239
-                    8	150717639	157362334
-                    8	157773346	164029864
-                    9	165057394	171518239
-                    10	172843790	179442817
-                    11	180675853	187389051
-
-
-
-
-            Then SpikingJelly will split the aedat to samples by the time range and class in the csv file. In this sample, \
-            the first sample ``user01_fluorescent_0.npz`` is sliced from the origin events ``user01_fluorescent.aedat`` with \
-            ``80048239 <= t < 85092709`` and ``label=0``. ``user01_fluorescent_0.npz`` will be saved in ``root/events_np/train/0``.
-
-
-
-
+            
+            The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
         print('Starting new version')
-        assert train is not None
+        assert train is True
         super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
     @staticmethod
     def resource_url_md5() -> list:
@@ -364,6 +278,235 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
                     aedat_file = os.path.join(aedat_dir, fname)
                     fname = os.path.splitext(fname)[0]
                     tpe.submit(DVSAnimals.split_aedat_files_to_np, fname, aedat_file, os.path.join(aedat_dir, fname + '.csv'), data_dir)
+
+
+        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+        print(f'All aedat files have been split to samples and saved into [{data_dir}].')
+
+    @staticmethod
+    def get_H_W() -> Tuple:
+        '''
+        :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W` is the weight of the data.
+            For example, this function returns ``(128, 128)`` for the DVS128 Gesture dataset.
+        :rtype: tuple
+        '''
+        return 128, 128
+    
+
+class DVSDailyActions(sjds.NeuromorphicDatasetFolder):
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            data_type: str = 'event',
+            frames_number: int = None,
+            split_by: str = None,
+            duration: int = None,
+            custom_integrate_function: Callable = None,
+            custom_integrated_frames_dir_name: str = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+    ) -> None:
+        """
+        The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
+
+        Refer to :class:`spikingjelly.datasets.NeuromorphicDatasetFolder` for more details about params information.
+
+
+        .. admonition:: Note
+            :class: note
+
+            There are 1121 samples. See that they are all stored in the train folder.
+
+            .. code-block:: python
+
+                from spikingjelly.datasets import dvs128_gesture
+
+                src_root = os.path.dirname(__file__)
+                data_root = os.path.join(os.path.dirname(src_root),'data')
+                data_animals = os.path.join(data_root,'SLAnimals_Dataset')
+                data_set = DVSAnimals(data_animals,train=True, data_type='frame', frames_number=T, split_by=splitby)
+                labels = [sample[1] for sample in data_set]
+                print('Posible labels:',np.unique(labels))
+                train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed) 
+
+            
+            The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
+
+        """
+        print('Starting new version')
+        assert train is True
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+    @staticmethod
+    def resource_url_md5() -> list:
+        '''
+        :return: A list ``url`` that ``url[i]`` is a tuple, which contains the i-th file's name, download link, and MD5
+        :rtype: list
+        '''
+        url = 'https://drive.google.com/drive/folders/1JrYJnikaJdiNgq5Zz5pwbN-nwns-NNpz'
+        #No files in download folder. The files are put it directly in extract folder
+        return [] 
+
+    @staticmethod
+    def downloadable() -> bool:
+        '''
+        :return: Whether the dataset can be directly downloaded by python codes. If not, the user have to download it manually
+        :rtype: bool
+        '''
+        return False
+
+    @staticmethod
+    def extract_downloaded_files(download_root: str, extract_root: str):
+        '''
+        :param download_root: Root directory path which saves downloaded dataset files
+        :type download_root: str
+        :param extract_root: Root directory path which saves extracted files from downloaded files
+        :type extract_root: str
+        :return: None
+
+        This function defines how to extract download files.
+        '''
+        #fpath = os.path.join(download_root, 'DvsGesture.tar.gz')
+        print(f'Extract it manually in .../extract/DailyAction folder. This folder contains one .aedat file per sample')
+        
+    @staticmethod
+    def get_aer_events_from_file(filename, data_version, data_start):
+        """
+        
+        FUNCIÓN COPIADA DE TONIC.IO
+
+        Get aer events from an aer file.
+
+        Parameters:
+            filename (str):         The name of the .aedat file
+            data_version (float):   The version of the .aedat file
+            data_start (int):       The start index of the data
+
+        Returns:
+            all_events:          Numpy structured array:
+                                    ['address'] the address of a neuron which fires
+                                    ['timeStamp'] the timeStamp in mus when a neuron fires
+        """
+        filename = os.path.expanduser(filename)
+        assert os.path.isfile(filename), "The .aedat file does not exist."
+        f = open(filename, "rb")
+        f.seek(data_start)
+
+        if 2 <= data_version < 3:
+            event_dtype = np.dtype([("address", ">u4"), ("timeStamp", ">u4")]) 
+            all_events = np.fromfile(f, event_dtype)
+        elif data_version > 3:
+            event_dtype = np.dtype([("address", "<u4"), ("timeStamp", "<u4")])
+            event_list = []
+            while True:
+                header = f.read(28)
+                if not header or len(header) == 0:
+                    break
+                # read header
+                capacity = struct.unpack("I", header[16:20])[0]
+                event_list.append(np.fromfile(f, event_dtype, capacity))
+            all_events = np.concatenate(event_list)
+        else:
+            raise NotImplementedError()
+        f.close()
+        return all_events
+    
+
+    @staticmethod
+    def load_origin_data(file_name: str) -> Dict:
+        '''
+        :param file_name: path of the events file
+        :type file_name: str
+        :return: a dict whose keys are ``['t', 'x', 'y', 'p']`` and values are ``numpy.ndarray``
+        :rtype: Dict
+
+        This function defines how to read the origin binary data.
+        '''
+
+        """Get the aer events from DVS with resolution of rows and cols are (128, 128)
+
+        Parameters:
+            filename: filename
+
+        Returns:
+            a dict whose keys are ``['t', 'x', 'y', 'p']`` and values are ``numpy.ndarray``
+        """
+        data_version, data_start = tonic.io.read_aedat_header_from_file(file_name)
+        all_events = DVSDailyActions.get_aer_events_from_file(file_name, data_version, data_start)
+        all_addr = all_events["address"]
+        t = all_events["timeStamp"].astype(np.uint32)  
+
+        x = (all_addr >> 8) & 0x007F
+        y = (all_addr >> 1) & 0x007F
+        p = all_addr & 0x1
+
+        events_dict = dict()
+        events_dict['x'] = np.array(x)
+        events_dict['y'] = np.array(y)
+        events_dict['t'] = np.array(t)
+        events_dict['p'] = np.array(p)   
+
+        return  events_dict                
+        
+                                           
+
+    @staticmethod
+    def split_aedat_files_to_np(fname: str, aedat_file: str, output_dir: str):
+        """
+        fname: parte inicial del nombre que le pondré al archivo .npz
+        aedat_file: fichero aedat donde se leen los eventos
+        #csv_file: donde se leen las etiquetas y límites de tiempo de cada etiqueta para el correspondiente fichero aedat
+        output_dir: archivo raiz donde se irán almacenando los .npz
+        """
+        events = DVSDailyActions.load_origin_data(aedat_file)
+        #print(f'Start to split [{aedat_file}] to samples.')
+        #print('Tiempo de eventos: ',events['t'])
+
+        file_name = os.path.join(output_dir, f'{fname}.npz')
+        np_savez(file_name,
+                    t=events['t'],
+                    x=events['x'],
+                    y=events['y'],
+                    p=events['p']
+                    )
+        print(f'[{file_name}] saved.')
+            
+
+    @staticmethod
+    def create_events_np_files(extract_root: str, events_np_root: str):
+        '''
+        :param extract_root: Root directory path which saves extracted files from downloaded files
+        :type extract_root: str
+        :param events_np_root: Root directory path which saves events files in the ``npz`` format
+        :type events_np_root:
+        :return: None
+
+        This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
+        '''
+        aedats_directories = os.path.join(extract_root, 'DailyAction')
+        data_dir = os.path.join(events_np_root, 'train')
+        os.mkdir(data_dir)
+        print(f'Mkdir {data_dir}.')
+        #subfolders name corresponds to the labels
+        labels = [it.name for it in os.scandir(aedats_directories) if it.is_dir()] 
+        for label in labels:
+            os.mkdir(os.path.join(data_dir, label))
+        print(f'Mkdir {os.listdir(data_dir)} in [{data_dir}].')
+
+        # use multi-thread to accelerate
+        t_ckp = time.time()
+        with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
+            print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+
+            for label in labels:
+                aedat_dir = os.path.join(aedats_directories,label)
+                output_dir = os.path.join(data_dir, label)
+                for fname in os.listdir(aedat_dir):
+                    if fname.endswith('.aedat'):
+                        aedat_file = os.path.join(aedat_dir, fname)
+                        #File name without .aedat
+                        fname = os.path.splitext(fname)[0]
+                        tpe.submit(DVSDailyActions.split_aedat_files_to_np, fname, aedat_file, output_dir)
 
 
         print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')

@@ -1,15 +1,14 @@
 import torch
 import sys
 import torch.nn.functional as F
-import torch.nn as nn
 import wandb
 import random
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
-from Animals import DVSAnimals
+from Datasets import DVSAnimals, DVSDailyActions
 from spikingjelly.datasets.dvs128_gesture import DVS128Gesture
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
-from copy import deepcopy
+from models import myDVSGestureNet
 import numpy as np
 import time
 import os
@@ -23,44 +22,6 @@ torch.manual_seed(seed)
 torch.backends.mps.deterministic = True
 
 
-#Net for Experiment 1. ES la red que propone spikingjelly para DVSNet
-class myDVSGestureNet(nn.Module):
-    def __init__(self, channels=128, output_size = 11, spiking_neuron: callable = None, **kwargs):
-        super().__init__()
-
-        conv = []
-        for i in range(5):
-            if conv.__len__() == 0:
-                in_channels = 2
-            else:
-                in_channels = channels
-
-            conv.append(layer.Conv2d(in_channels, channels, kernel_size=3, padding=1, bias=False))
-            conv.append(layer.BatchNorm2d(channels))
-            conv.append(spiking_neuron(**deepcopy(kwargs)))
-            conv.append(layer.MaxPool2d(2, 2))
-
-
-        self.conv_fc = nn.Sequential(
-            *conv,
-
-            layer.Flatten(),
-            layer.Dropout(0.5),
-            layer.Linear(channels * 4 * 4, 512),
-            spiking_neuron(**deepcopy(kwargs)),
-
-            layer.Dropout(0.5),
-            #La última capa cambia su tamaño en función del número de clases posibles. De esta manera la capa de votación(VotingLayer) la dejamos fijas con 10 neuronas por voto('maxpooling' de 10)
-            layer.Linear(512, output_size * 10),   
-            spiking_neuron(**deepcopy(kwargs)),
-
-            layer.VotingLayer(10)  
-        )
-
-    def forward(self, x: torch.Tensor):
-        return self.conv_fc(x)
-
-
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
 
@@ -69,20 +30,24 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     start_epoch = 0
     relative_root = os.path.basename(inp_data)
 
+    test_set = None
     #Carga de datos en función del dataset que se vaya a usar
     if relative_root == 'DVS_Gesture_dataset':
-        nclasses_ = 11
         train_set = DVS128Gesture(root = inp_data, train = True, data_type = 'frame', frames_number = T, split_by = splitby)
         test_set = DVS128Gesture(root = inp_data, train = False, data_type = 'frame', frames_number = T, split_by = splitby)
     elif relative_root == 'SLAnimals_Dataset':
-        nclasses_ = 19
-        data_set = DVSAnimals(inp_data,train=True, data_type='frame', frames_number=T, split_by=splitby)
-        labels = [sample[1] for sample in data_set]
-        print('Posible labels:',np.unique(labels))
-        train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed) 
+        data_set = DVSAnimals(root = inp_data, train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
+    elif relative_root == 'DVS_DailyAction_dataset':
+        data_set = DVSDailyActions(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
 
+    #In case the dataset has not been split yet:
+    if test_set is None:
+        labels = [sample[1] for sample in data_set]
+        train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed)
+    #Número de clases
+    nclasses_ = len(train_set.classes) 
     #Arquitectura de red que se va a usar
     if net_name == 'DVSG_net':
         net = myDVSGestureNet(channels=128, output_size = nclasses_, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)

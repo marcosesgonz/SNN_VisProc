@@ -8,3 +8,5 @@ data/**/*.txt
 *.rar
 *.gz
 data/Actions_Dataset
+*.pyc
+
