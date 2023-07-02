@@ -4,6 +4,7 @@ spikingjelly_alias
 *.npz
 #Quitar archivos .txt dentro de subcarpetas de data
 data/**/*.txt 
+/**/*.DS_Store
 *.DS_Store
 *.rar
 *.gz
