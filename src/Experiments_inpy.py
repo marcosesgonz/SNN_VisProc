@@ -5,6 +5,7 @@ src_root = os.path.dirname(__file__)
 data_root = os.path.join(os.path.dirname(src_root),'data')
 data_animals = os.path.join(data_root,'SLAnimals_Dataset')
 data_gesture = os.path.join(data_root,'DVS_Gesture_dataset')
+data_dailyactions = os.path.join(data_root,'DVS_DailyAction_dataset')
 
 
 if __name__ == '__main__':
@@ -14,6 +15,8 @@ if __name__ == '__main__':
         dataset = data_animals
     if dataset == 'Gesture':
         dataset = data_gesture
+    if dataset =='DailyAct':
+        dataset = data_dailyactions
     
     epochs_ = input('Número de épocas(default = 30): ')
     if len(epochs_) == 0:
