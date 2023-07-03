@@ -1,0 +1,59 @@
+picking up,chenjieneng_4.1.aedat
+picking up,xiaohuang_4.1.aedat
+picking up,kaibo_4.2.aedat
+picking up,ningxiangyu_4.2.aedat
+picking up,tanglixuan_4.2.aedat
+picking up,houjing_4.2.aedat
+get-up,zhangliming_2.2.aedat
+get-up,kaibo_2.3.aedat
+get-up,xiaohuang_2.2.aedat
+get-up,houjing_2.1.aedat
+get-up,xiaohuang_2.1.aedat
+get-up,miaoshu_2.3.aedat
+turning around,zhangliming_8.2.aedat
+turning around,ningxiangyu_8.1.aedat
+turning around,ziyang_8.1.aedat
+turning around,liuxingbo_8.2.aedat
+turning around,liuxingbo_8.3.aedat
+turning around,chenjieneng_8.3.aedat
+waving,xiaohuang_10.1.aedat
+waving,miaoshu_10.3.aedat
+waving,zhangliming_10.1.aedat
+waving,ningxiangyu_10.3.aedat
+waving,xiaohuang_10.2.aedat
+waving,kaibo_10.1.aedat
+throwing,tanglixuan_7.3.aedat
+throwing,houjing_7.1.aedat
+throwing,liuxingbo_7.2.aedat
+throwing,chenjieneng_7.2.aedat
+throwing,zhangliming_7.1.aedat
+throwing,zhangliming_7.2.aedat
+walking,kaibo_9.3.aedat
+walking,ziyang_9.1.aedat
+walking,ziyang_9.2.aedat
+walking,chenjieneng_9.1.aedat
+walking,xiaohuang_9.2.aedat
+walking,ningxiangyu_9.2.aedat
+kicking,houjing_3.3.aedat
+kicking,kaibo_3.3.aedat
+kicking,chenjieneng_3.3.aedat
+kicking,miaoshu_3.1.aedat
+kicking,liuxingbo_3.2.aedat
+kicking,chenjieneng_3.2.aedat
+arm crossing,tanglixuan_1.1.aedat
+arm crossing,miaoshu_1.1.aedat
+arm crossing,chenjieneng_1.2.aedat
+arm crossing,liuxingbo_1.3.aedat
+arm crossing,xiaohuang_1.1.aedat
+arm crossing,xiaohuang_1.2.aedat
+jumping,kaibo_5.2.aedat
+jumping,xiaohuang_5.2.aedat
+jumping,ziyang_5.1.aedat
+jumping,chenjieneng_5.1.aedat
+jumping,liuxingbo_5.1.aedat
+sit-down,kaibo_6.3.aedat
+sit-down,tanglixuan_6.3.aedat
+sit-down,xiaohuang_6.1.aedat
+sit-down,zhangliming_6.1.aedat
+sit-down,liuxingbo_6.1.aedat
+sit-down,ningxiangyu_6.1.aedat
