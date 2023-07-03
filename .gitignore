@@ -11,3 +11,4 @@ data/**/*.txt
 data/Actions_Dataset
 /**/*.pyc
 src/result_logs
+src/wandb
