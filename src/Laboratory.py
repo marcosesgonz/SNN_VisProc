@@ -40,7 +40,8 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     elif relative_root == 'DVS_DailyAction_dataset':
         data_set = DVSDailyActions(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     elif relative_root == 'DVS_ActionRecog_dataset':
-        data_set = DVSActionRecog(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
+        train_set = DVSActionRecog(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
+        test_set = DVSActionRecog(root = inp_data,train = False, data_type = 'frame', frames_number = T, split_by = splitby) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
   
@@ -48,17 +49,19 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     #In case the dataset has not been split yet: (Also obtain number of classes)
     if test_set is None:
         nclasses_ = len(data_set.classes)
+        sizexy = data_set.get_H_W()
         labels = [sample[1] for sample in data_set]
         train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed)
     else:
         nclasses_ = len(train_set.classes) 
+        sizexy = train_set.get_H_W()
 
     train_size_ = len(train_set)
     test_size_ = len(test_set)
 
     #Arquitectura de red que se va a usar
     if net_name == 'DVSG_net':
-        net = myDVSGestureNet(channels=128, output_size = nclasses_, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
+        net = myDVSGestureNet(channels=128, output_size = nclasses_,input_sizexy= sizexy, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
     else:
         raise ValueError('Unknown arquitecture. Could check posible names.')
     
@@ -73,7 +76,7 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         nclasses = nclasses_,
         train_size = train_size_,
         test_size = test_size_,
-        labels = data_set.class_to_idx,
+        labels = train_set.class_to_idx,
         batch_size=batch_size,
         learning_rate=lr,
         dataset=relative_root,
@@ -106,7 +109,7 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
             num_workers=4,
             pin_memory=True
         )
-
+        print('Tamaño de imágenes',sizexy)
         print('Número de clases: ',nclasses_)
         print('Nº instancias train/test:', train_size_,'/', test_size_)
         #Optimizamos con SGD

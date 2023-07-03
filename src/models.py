@@ -23,7 +23,6 @@ class myDVSGestureNet(nn.Module):
 
         outp_convx = input_sizexy[0] // (2**nconv_blocks)
         outp_convy = input_sizexy[1] // (2**nconv_blocks)
-        print(outp_convx,outp_convy)
 
         self.conv_fc = nn.Sequential(
             *conv,

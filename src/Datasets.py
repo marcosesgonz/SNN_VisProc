@@ -11,6 +11,7 @@ from spikingjelly import configure
 from spikingjelly.datasets import np_savez
 import struct
 import tonic
+import random
 
 class DVSAnimals(sjds.NeuromorphicDatasetFolder):
     def __init__(
@@ -63,7 +64,7 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
         for label in labels_load:
             labels_defs[label[1]] = int(label[0]) - 1
         self.class_to_idx = labels_defs
-        
+
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -531,7 +532,6 @@ class DVSDailyActions(sjds.NeuromorphicDatasetFolder):
         return 128, 128
     
 
-
 class DVSActionRecog(sjds.NeuromorphicDatasetFolder):
     def __init__(
             self,
@@ -573,7 +573,6 @@ class DVSActionRecog(sjds.NeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        assert train is True
         super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
     @staticmethod
     def resource_url_md5() -> list:
@@ -711,6 +710,37 @@ class DVSActionRecog(sjds.NeuromorphicDatasetFolder):
                     )
         print(f'[{file_name}] saved.')
             
+    @staticmethod
+    def create_traintest_split_file(root, seed = 40,end_files = '.aedat',train_size = 0.8):
+        """
+        Create two .txt files in 'root' folder with the root of the samples for train and for test:
+            trials_to_train.txt
+            trials_to_test.txt
+        Parameters:
+            root (str): Root with the samples. This root must include inside one folder per classs.
+        """
+        random.seed(seed)
+        file_train = os.path.join(root,'trials_to_train.txt')
+        file_test = os.path.join(root,'trials_to_test.txt')
+        if os.path.exists(file_train) or os.path.exists(file_test):
+            raise ('Files already exist. If they are wrong. Delete it')
+        
+        labels = [it.name for it in os.scandir(root) if it.is_dir()] 
+
+        with open(file_train,'w') as f_train, open(file_test,'w') as f_test:
+            for label in labels:
+                aedat_dir = os.path.join(root,label)
+                aedats_list = [file for file in os.listdir(aedat_dir) if file.endswith(end_files)]
+                random.shuffle(aedats_list)
+                n_samples = len(aedats_list)
+                n_samples_train = int(train_size * n_samples)
+
+                for i,fname in enumerate(aedats_list):
+                        file = label + ',' + fname
+                        if i < n_samples_train:
+                            f_train.write(file +'\n')
+                        else:
+                            f_test.write(file +'\n')
 
     @staticmethod
     def create_events_np_files(extract_root: str, events_np_root: str):
@@ -724,33 +754,50 @@ class DVSActionRecog(sjds.NeuromorphicDatasetFolder):
         This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
         '''
         aedats_directories = os.path.join(extract_root, 'ActionRecognition')
-        data_dir = os.path.join(events_np_root, 'train')
-        os.mkdir(data_dir)
-        print(f'Mkdir {data_dir}.')
+        train_dir = os.path.join(events_np_root, 'train')
+        test_dir = os.path.join(events_np_root, 'test')
+        os.mkdir(train_dir)
+        os.mkdir(test_dir)
+        print(f'Mkdir [{train_dir, test_dir}.')
         #subfolders name corresponds to the labels
         labels = [it.name for it in os.scandir(aedats_directories) if it.is_dir()] 
         for label in labels:
-            os.mkdir(os.path.join(data_dir, label))
-        print(f'Mkdir {os.listdir(data_dir)} in [{data_dir}].')
+            os.mkdir(os.path.join(train_dir, label))
+            os.mkdir(os.path.join(test_dir, label))
+        print(f'Mkdir {os.listdir(train_dir)} in [{train_dir}] and {os.listdir(test_dir)} in [{test_dir}].')
 
-        # use multi-thread to accelerate
-        t_ckp = time.time()
-        with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
-            print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
 
-            for label in labels:
-                aedat_dir = os.path.join(aedats_directories,label)
-                output_dir = os.path.join(data_dir, label)
-                for fname in os.listdir(aedat_dir):
-                    if fname.endswith('.aedat'):
-                        aedat_file = os.path.join(aedat_dir, fname)
-                        #File name without .aedat
+        file_train = os.path.join(aedats_directories,'trials_to_train.txt')
+        file_test = os.path.join(aedats_directories,'trials_to_test.txt')
+        if  (not os.path.exists(file_train)) or (not os.path.exists(file_test)):
+            print('Files to split data doesnt exist. Creating them: ',file_train,' ',file_test)
+            DVSActionRecog.create_traintest_split_file(aedats_directories)
+
+        with open(file_train) as trials_to_train_txt, open(file_test) as trials_to_test_txt:
+            # use multi-thread to accelerate
+            t_ckp = time.time()
+            with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
+                random.seed(42)
+                print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                for line in trials_to_train_txt.readlines():
+                    label, fname = line.strip().split(',')
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedats_directories,label, fname)
                         fname = os.path.splitext(fname)[0]
-                        tpe.submit(DVSActionRecog.split_aedat_files_to_np, fname, aedat_file, output_dir)
+                        output_dir = os.path.join(train_dir,label)
+                        tpe.submit(DVSActionRecog.split_aedat_files_to_np, fname, aedat_file,  output_dir)
+
+                for line in trials_to_test_txt.readlines():
+                    label, fname = line.strip().split(',')
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedats_directories,label, fname)
+                        fname = os.path.splitext(fname)[0]
+                        output_dir = os.path.join(test_dir,label)
+                        tpe.submit(DVSActionRecog.split_aedat_files_to_np, fname, aedat_file,  output_dir)
 
 
-        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
-        print(f'All aedat files have been split to samples and saved into [{data_dir}].')
+            print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+        print(f'All aedat files have been split to samples and saved into [{train_dir, test_dir}].')
 
     @staticmethod
     def get_H_W() -> Tuple:
