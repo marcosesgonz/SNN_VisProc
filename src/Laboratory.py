@@ -6,6 +6,7 @@ import random
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog
 from spikingjelly.datasets.dvs128_gesture import DVS128Gesture
+from spikingjelly.activation_based.model.sew_resnet import sew_resnet18
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from models import myDVSGestureNet
@@ -62,6 +63,8 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     #Arquitectura de red que se va a usar
     if net_name == 'DVSG_net':
         net = myDVSGestureNet(channels=128, output_size = nclasses_,input_sizexy= sizexy, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
+    if net_name == 'resnet18':
+        net = sew_resnet18(spiking_neuron=neuron.LIFNode,num_classes = nclasses_, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
     else:
         raise ValueError('Unknown arquitecture. Could check posible names.')
     
@@ -90,6 +93,7 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         if device == 'cuda':
             #Limpió la cache de la GPU
             torch.cuda.empty_cache()
+
         net.to(device)
         
         train_data_loader = torch.utils.data.DataLoader(

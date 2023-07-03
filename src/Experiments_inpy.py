@@ -10,6 +10,8 @@ data_actrec = os.path.join(data_root,'DVS_ActionRecog_dataset')
 
 if __name__ == '__main__':
 
+    netname = input('Nombre de la red(DVSG_net/resnet18): ')
+
     dataset = input('Dataset to use(Animals/Gesture/DailyAct/ActRec): ')
     if dataset == 'Animals':
         dataset = data_animals
@@ -44,4 +46,5 @@ if __name__ == '__main__':
                                     epochs = epochs_,
                                     batch_size = batch_size_,
                                     lr = learning_rate_,
-                                    device = device_)
+                                    device = device_,
+                                    net_name=netname)
