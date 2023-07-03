@@ -5,11 +5,12 @@ from copy import deepcopy
 
 #Net for Experiment 1. ES la red que propone spikingjelly para DVSNet
 class myDVSGestureNet(nn.Module):
-    def __init__(self, channels=128, output_size = 11, spiking_neuron: callable = None, **kwargs):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),spiking_neuron: callable = None, **kwargs):
         super().__init__()
 
         conv = []
-        for i in range(5):
+        nconv_blocks = 5
+        for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 2
             else:
@@ -20,13 +21,17 @@ class myDVSGestureNet(nn.Module):
             conv.append(spiking_neuron(**deepcopy(kwargs)))
             conv.append(layer.MaxPool2d(2, 2))
 
+        outp_convx = input_sizexy[0] // (2**nconv_blocks)
+        outp_convy = input_sizexy[1] // (2**nconv_blocks)
+        print(outp_convx,outp_convy)
 
         self.conv_fc = nn.Sequential(
             *conv,
 
             layer.Flatten(),
             layer.Dropout(0.5),
-            layer.Linear(channels * 4 * 4, 512),
+            #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
+            layer.Linear(channels * outp_convx * outp_convy, 512), 
             spiking_neuron(**deepcopy(kwargs)),
 
             layer.Dropout(0.5),

@@ -53,9 +53,17 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        print('Starting new version')
         assert train is True
         super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+        
+        #Definitions of labels
+        labeldef_root = os.path.join(root,'extract','SL-Animals-DVS_gestures_definitions.csv')
+        labels_load = np.loadtxt(labeldef_root,dtype=str,delimiter=',',skiprows=1)
+        labels_defs = dict()
+        for label in labels_load:
+            labels_defs[label[1]] = int(label[0]) - 1
+        self.class_to_idx = labels_defs
+        
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -260,6 +268,7 @@ class DVSAnimals(sjds.NeuromorphicDatasetFolder):
         '''
         aedat_dir = os.path.join(extract_root, 'Animals')
         data_dir = os.path.join(events_np_root, 'train')
+    
         os.mkdir(data_dir)
         print(f'Mkdir {data_dir}.')
         for label in range(19):

@@ -35,7 +35,7 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     if relative_root == 'DVS_Gesture_dataset':
         train_set = DVS128Gesture(root = inp_data, train = True, data_type = 'frame', frames_number = T, split_by = splitby)
         test_set = DVS128Gesture(root = inp_data, train = False, data_type = 'frame', frames_number = T, split_by = splitby)
-    elif relative_root == 'SLAnimals_Dataset':
+    elif relative_root == 'DVS_Animals_Dataset':
         data_set = DVSAnimals(root = inp_data, train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
     elif relative_root == 'DVS_DailyAction_dataset':
         data_set = DVSDailyActions(root = inp_data,train = True, data_type = 'frame', frames_number = T, split_by = splitby) 
