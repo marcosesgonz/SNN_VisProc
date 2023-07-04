@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from spikingjelly.activation_based import layer
+from spikingjelly.activation_based.model import sew_resnet as sewr
 import numpy as np
 from copy import deepcopy
 
@@ -96,9 +97,9 @@ class mySEWResNet(nn.Module):
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if zero_init_residual:
             for m in self.modules():
-                if isinstance(m, Bottleneck):
+                if isinstance(m, sewr.Bottleneck):
                     nn.init.constant_(m.bn3.weight, 0)
-                elif isinstance(m, BasicBlock):
+                elif isinstance(m, sewr.BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)
 
     def _make_layer(self, block, planes, blocks, stride=1, dilate=False, cnf: str=None, spiking_neuron: callable = None, **kwargs):
@@ -110,7 +111,7 @@ class mySEWResNet(nn.Module):
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
+                sewr.conv1x1(self.inplanes, planes * block.expansion, stride),
                 norm_layer(planes * block.expansion),
             )
 
@@ -149,3 +150,34 @@ class mySEWResNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
+
+
+
+def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, **kwargs):
+    model = mySEWResNet(block, layers, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+    if pretrained:
+        state_dict = sewr.load_state_dict_from_url(sewr.model_urls[arch],
+                                              progress=progress)
+        model.load_state_dict(state_dict)
+    return model
+
+
+def mysew_resnet18(pretrained=False, progress=True, cnf: str = None, spiking_neuron: callable=None, **kwargs):
+    """
+    :param pretrained: If True, the SNN will load parameters from the ANN pre-trained on ImageNet
+    :type pretrained: bool
+    :param progress: If True, displays a progress bar of the download to stderr
+    :type progress: bool
+    :param cnf: the name of spike-element-wise function
+    :type cnf: str
+    :param spiking_neuron: a spiking neuron layer
+    :type spiking_neuron: callable
+    :param kwargs: kwargs for `spiking_neuron`
+    :type kwargs: dict
+    :return: Spiking ResNet-18
+    :rtype: torch.nn.Module
+
+    The spike-element-wise ResNet-18 `"Deep Residual Learning in Spiking Neural Networks" <https://arxiv.org/abs/2102.04159>`_ modified by the ResNet-18 model from `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    """
+
+    return _mysew_resnet('resnet18', sewr.BasicBlock, [2, 2, 2, 2], pretrained, progress, cnf, spiking_neuron, **kwargs)
