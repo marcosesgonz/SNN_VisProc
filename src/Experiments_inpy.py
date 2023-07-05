@@ -33,7 +33,7 @@ if __name__ == '__main__':
     learning_rate_ = float(inputdata('Set learning rate (default = 0.1): ', 0.1))
     device_ = inputdata('Device (cuda(default) /mps): ','cuda')
 
-    Laboratory.execute_experiment(inp_data = dataset,
+    Laboratory.execute_experiment_v2(inp_data = dataset,
                                     T = timestep_,
                                     splitby= split_strat,
                                     epochs = epochs_,
