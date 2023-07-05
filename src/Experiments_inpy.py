@@ -3,7 +3,7 @@ import os
 
 src_root = os.path.dirname(__file__)
 data_root = os.path.join(os.path.dirname(src_root),'data')
-data_animals = os.path.join(data_root,'SLAnimals_Dataset')
+data_animals = os.path.join(data_root,'DVS_Animals_Dataset')
 data_gesture = os.path.join(data_root,'DVS_Gesture_dataset')
 data_dailyactions = os.path.join(data_root,'DVS_DailyAction_dataset')
 data_actrec = os.path.join(data_root,'DVS_ActionRecog_dataset')
