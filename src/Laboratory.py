@@ -25,11 +25,11 @@ torch.backends.mps.deterministic = True
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
 
-def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, device = 'mps',lr = 0.1, inp_data= data_dir, net_name = 'DVSG_net'):
+def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
+                        device = 'mps',lr = 0.1, inp_data= data_dir, 
+                        net_name = 'DVSG_net',run_id = None ):
     
-    start_epoch = 0
     relative_root = os.path.basename(inp_data)
-
     test_set = None
     #Carga de datos en función del dataset que se vaya a usar
     if relative_root == 'DVS_Gesture_dataset':
@@ -70,25 +70,31 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
     #Establecemos las neuronas en modo multipaso
     functional.set_step_mode(net, 'm') 
 
-
     #Registro en wandb para la monitorización
     wandb.login()
-    hyperparameters = dict(epochs=epochs,
-        time_step = T,
-        nclasses = nclasses_,
-        train_size = train_size_,
-        test_size = test_size_,
-        labels = train_set.class_to_idx,
-        batch_size=batch_size,
-        learning_rate=lr,
-        dataset=relative_root,
-        architecture=net_name,
-        )
-    
-    project_ref = input('Introducir el proyecto(fijarse en los que ya hay en wandb):')
-    name_experim = input('Introducir el nombre concreto de esta ejecución(CUIDADO con sobreescribir¿?):')
+    if run_id is not None:
+        hyperparameters = None
+        name_experim = None
+        checkpoint_file = input('Checkpoint file(.kpath) with desired trained model:')
+        resume_ = 'must'
+    else:
+        hyperparameters = dict(epochs=epochs,
+            time_step = T,
+            nclasses = nclasses_,
+            train_size = train_size_,
+            test_size = test_size_,
+            labels = train_set.class_to_idx,
+            batch_size=batch_size,
+            learning_rate=lr,
+            dataset=relative_root,
+            architecture=net_name)
+        resume_ = None
 
-    with wandb.init(project = project_ref, name=name_experim,config=hyperparameters): 
+    project_ref = input('Introducir el proyecto(fijarse en los que ya hay en wandb):')
+    name_experim = input('Introducir el nombre concreto de esta ejecución:')
+
+    with wandb.init(project = project_ref, name = name_experim,
+                    config = hyperparameters, id = run_id,resume = resume_): 
         if device == 'cuda':
             #Limpió la cache de la GPU
             torch.cuda.empty_cache()
@@ -122,9 +128,20 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
 
         max_test_acc = -1
-        root_file = os.path.dirname(__file__)
-        out_dir = os.path.join(root_file,'result_logs',relative_root, f'T{T}_b{batch_size}_lr{lr}')
+        start_epoch = 0
 
+        if checkpoint_file is not None:
+            dicts = torch.load(checkpoint_file)
+
+            lr_scheduler.load_state_dict(dicts['lr_scheduler'])
+            optimizer.load_state_dict(dicts['optimizer'])
+            net.load_state_dict(dicts['net'])
+            max_test_acc = dicts['max_test_acc']
+            start_epoch = dicts['epoch'] + 1
+            print('Trained model succesfully loaded')
+
+        root_file = os.path.dirname(__file__)
+        out_dir = os.path.join(root_file,'result_logs',relative_root, f'T{T}_b{batch_size}_lr{lr}_{name_experim}')
 
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
@@ -222,6 +239,5 @@ def execute_experiment(T = 16,splitby = 'number',batch_size = 8, epochs = 30, de
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')
             print(f'train speed ={train_speed: .4f} images/s, test speed ={test_speed: .4f} images/s')
             print(f'escape time = {(datetime.datetime.now() + datetime.timedelta(seconds=(time.time() - start_time) * (epochs - epoch))).strftime("%Y-%m-%d %H:%M:%S")}\n')
-        print('Max test accuracy(not 100percent sure) = ',max_test_acc)
 
 
