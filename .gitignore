@@ -12,3 +12,4 @@ data/Actions_Dataset
 /**/*.pyc
 src/result_logs
 src/wandb
+src/gifs_*

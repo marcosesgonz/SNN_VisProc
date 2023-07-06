@@ -4,6 +4,7 @@ from torchvision.datasets import utils
 from abc import abstractmethod
 from spikingjelly import datasets as sjds
 from torchvision.datasets import DatasetFolder
+from sklearn.model_selection import train_test_split
 from torchvision.datasets.utils import extract_archive
 import os
 import multiprocessing
@@ -388,16 +389,15 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        assert train is True
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
-        
         #Definitions of labels
         labeldef_root = os.path.join(root,'extract','SL-Animals-DVS_gestures_definitions.csv')
         labels_load = np.loadtxt(labeldef_root,dtype=str,delimiter=',',skiprows=1)
         labels_defs = dict()
         for label in labels_load:
-            labels_defs[label[1]] = int(label[0]) - 1
-        self.class_to_idx = labels_defs
+            labels_defs[int(label[0]) - 1] = label[1]
+        self.classes_def = labels_defs
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+
 
     @staticmethod
     def resource_url_md5() -> list:
@@ -512,11 +512,8 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
         events_dict['p'] = np.array(p)   
 
         return  events_dict                 #sjds.load_aedat_v3(file_name)
-        
-                                           
-
-    @staticmethod
-    def split_aedat_files_to_np(fname: str, aedat_file: str, csv_file: str, output_dir: str):
+    @staticmethod        
+    def split_aedat_files_to_np(classes: dict,fname: str, aedat_file: str, csv_file: str, output_dir: str):
         """
         fname: parte inicial del nombre que le pondré al archivo .npz
         aedat_file: fichero aedat donde se leen los eventos
@@ -531,19 +528,13 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
 
         # Note that there are some files that many samples have the same label, e.g., user26_fluorescent_labels.csv
         label_file_num = [0] * 19
-
-        # There are some wrong time stamp in this dataset, e.g., in user22_led_labels.csv, ``endTime_usec`` of the class 9 is
-        # larger than ``startTime_usec`` of the class 10. So, the following codes, which are used in old version of SpikingJelly,
-        # are replaced by new codes.
-        #print('Tiempo de eventos: ',events['t'])
-
         for i in range(csv_data.shape[0]):
             # the label of Animals is 1, 2, ..., 19. We set 0 as the first label, rather than 1
             label = csv_data[i][0] - 1
             ind_start = csv_data[i][1]
             ind_end = csv_data[i][2]
             #print('etiqueta, ind_inicial, ind_final: ',label,ind_start,ind_end)
-            file_name = os.path.join(output_dir, str(label), f'{fname}_{label_file_num[label]}.npz')#Hago un directorio para cada etiqueta
+            file_name = os.path.join(output_dir, classes[label], f'{fname}_{label_file_num[label]}.npz')#Hago un directorio para cada etiqueta
             np_savez(file_name,
                      t=events['t'][ind_start:ind_end],
                      x=events['x'][ind_start:ind_end],
@@ -552,46 +543,36 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
                      )
             print(f'[{file_name}] saved.')
             label_file_num[label] += 1
-            
-
-        # old codes:
-
-        # index = 0
-        # index_l = 0
-        # index_r = 0
-        # for i in range(csv_data.shape[0]):
-        #     # the label of DVS128 Gesture is 1, 2, ..., 11. We set 0 as the first label, rather than 1
-        #     label = csv_data[i][0] - 1
-        #     t_start = csv_data[i][1]
-        #     t_end = csv_data[i][2]
-        #
-        #     while True:
-        #         t = events['t'][index]
-        #         if t < t_start:
-        #             index += 1
-        #         else:
-        #             index_l = index
-        #             break
-        #     while True:
-        #         t = events['t'][index]
-        #         if t < t_end:
-        #             index += 1
-        #         else:
-        #             index_r = index
-        #             break
-        #
-        #     file_name = os.path.join(output_dir, str(label), f'{fname}_{label_file_num[label]}.npz')
-        #     np.savez(file_name,
-        #         t=events['t'][index_l:index_r],
-        #         x=events['x'][index_l:index_r],
-        #         y=events['y'][index_l:index_r],
-        #         p=events['p'][index_l:index_r]
-        #     )
-        #     print(f'[{file_name}] saved.')
-        #     label_file_num[label] += 1
-
+    
     @staticmethod
-    def create_events_np_files(extract_root: str, events_np_root: str):
+    def create_traintest_split_file(root, seed = 40,end_files = '.aedat',train_size = 0.8):
+        """
+        Create two .txt files in 'root' folder with the root of the samples for train and for test:
+            trials_to_train.txt
+            trials_to_test.txt
+        Parameters:
+            root (str): Root with the samples. This root must include inside one folder per classs.
+        """
+        random.seed(seed)
+        file_train = os.path.join(root,'trials_to_train.txt')
+        file_test = os.path.join(root,'trials_to_test.txt')
+        if os.path.exists(file_train) or os.path.exists(file_test):
+            raise ('Files to split data already exist. If they are wrong. Delete it')
+        
+        aedats_list = [file for file in os.listdir(root) if file.endswith(end_files)]
+        #sublabel refers to the environment where the 'videos' where taken (indoor, sunlight....)
+        sublabels_list = [file.split('_')[1] for file in aedats_list]
+        train, test = train_test_split(aedats_list,stratify=sublabels_list,test_size=0.2,random_state=seed,train_size=train_size)
+
+        with open(file_train,'w') as f_train:
+            for file in train:
+                f_train.write(file +'\n')
+
+        with open(file_test,'w') as f_test:
+            for file in test:
+                f_test.write(file +'\n')
+
+    def create_events_np_files(self,extract_root: str, events_np_root: str):
         '''
         :param extract_root: Root directory path which saves extracted files from downloaded files
         :type extract_root: str
@@ -602,30 +583,42 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
         This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
         '''
         aedat_dir = os.path.join(extract_root, 'Animals')
-        data_dir = os.path.join(events_np_root, 'train')
+        train_dir = os.path.join(events_np_root, 'train')
+        test_dir = os.path.join(events_np_root, 'test')
     
-        os.mkdir(data_dir)
-        print(f'Mkdir {data_dir}.')
-        for label in range(19):
-            os.mkdir(os.path.join(data_dir, str(label)))
-        print(f'Mkdir {os.listdir(data_dir)} in [{data_dir}].')
+        os.mkdir(train_dir)
+        os.mkdir(test_dir)
+        print(f'Mkdir [{train_dir, test_dir}.')
+        for label in self.classes_def.values():
+            os.mkdir(os.path.join(train_dir, label))
+            os.mkdir(os.path.join(test_dir, label))
+        print(f'Mkdir {os.listdir(train_dir)} in [{train_dir}] and {os.listdir(test_dir)} in [{test_dir}].')
 
-        #with open(os.path.join(aedat_dir, 'trials_to_train.txt')) as trials_to_train_txt, open(
-        #        os.path.join(aedat_dir, 'trials_to_test.txt')) as trials_to_test_txt:
+        file_train = os.path.join(aedat_dir,'trials_to_train.txt')
+        file_test = os.path.join(aedat_dir,'trials_to_test.txt')
+        if  (not os.path.exists(file_train)) or (not os.path.exists(file_test)):
+            print('Files to split data doesnt exist. Creating them: ',file_train,' ',file_test)
+            DVSAnimals.create_traintest_split_file(aedat_dir)
         # use multi-thread to accelerate
-        t_ckp = time.time()
-        with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
-            print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
-
-            for fname in os.listdir(aedat_dir):
-                if fname.endswith('.aedat'):
-                    aedat_file = os.path.join(aedat_dir, fname)
-                    fname = os.path.splitext(fname)[0]
-                    tpe.submit(DVSAnimals.split_aedat_files_to_np, fname, aedat_file, os.path.join(aedat_dir, fname + '.csv'), data_dir)
-
-
-        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
-        print(f'All aedat files have been split to samples and saved into [{data_dir}].')
+        with open(file_train) as trials_to_train_txt, open(file_test) as trials_to_test_txt:
+            # use multi-thread to accelerate
+            t_ckp = time.time()
+            with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
+                print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                for fname in trials_to_train_txt.readlines():
+                    fname = fname.strip()
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedat_dir, fname)
+                        fname = os.path.splitext(fname)[0]
+                        tpe.submit(DVSAnimals.split_aedat_files_to_np,self.classes_def, fname, aedat_file, os.path.join(aedat_dir, fname + '.csv'), train_dir)
+                for fname in trials_to_test_txt.readlines():
+                    fname = fname.strip()
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedat_dir, fname)
+                        fname = os.path.splitext(fname)[0]
+                        tpe.submit(DVSAnimals.split_aedat_files_to_np,self.classes_def, fname, aedat_file, os.path.join(aedat_dir, fname + '.csv'), test_dir)
+            print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+        print(f'All aedat files have been split to samples and saved into [{train_dir, test_dir}].')
 
     @staticmethod
     def get_H_W() -> Tuple:
@@ -678,8 +671,6 @@ class DVSDailyActions(MyNeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        print('Starting new version')
-        assert train is True
         super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
     @staticmethod
     def resource_url_md5() -> list:
@@ -815,6 +806,37 @@ class DVSDailyActions(MyNeuromorphicDatasetFolder):
                     )
         print(f'[{file_name}] saved.')
             
+    @staticmethod
+    def create_traintest_split_file(root, seed = 40,end_files = '.aedat',train_size = 0.8):
+        """
+        Create two .txt files in 'root' folder with the root of the samples for train and for test:
+            trials_to_train.txt
+            trials_to_test.txt
+        Parameters:
+            root (str): Root with the samples. This root must include inside one folder per classs.
+        """
+        random.seed(seed)
+        file_train = os.path.join(root,'trials_to_train.txt')
+        file_test = os.path.join(root,'trials_to_test.txt')
+        if os.path.exists(file_train) or os.path.exists(file_test):
+            raise ('Files already exist. If they are wrong. Delete it')
+        
+        labels = [it.name for it in os.scandir(root) if it.is_dir()] 
+
+        with open(file_train,'w') as f_train, open(file_test,'w') as f_test:
+            for label in labels:
+                aedat_dir = os.path.join(root,label)
+                aedats_list = [file for file in os.listdir(aedat_dir) if file.endswith(end_files)]
+                random.shuffle(aedats_list)
+                n_samples = len(aedats_list)
+                n_samples_train = int(train_size * n_samples)
+
+                for i,fname in enumerate(aedats_list):
+                        file = label + ',' + fname
+                        if i < n_samples_train:
+                            f_train.write(file +'\n')
+                        else:
+                            f_test.write(file +'\n')
 
     @staticmethod
     def create_events_np_files(extract_root: str, events_np_root: str):
@@ -828,33 +850,48 @@ class DVSDailyActions(MyNeuromorphicDatasetFolder):
         This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
         '''
         aedats_directories = os.path.join(extract_root, 'DailyAction')
-        data_dir = os.path.join(events_np_root, 'train')
-        os.mkdir(data_dir)
-        print(f'Mkdir {data_dir}.')
+        train_dir = os.path.join(events_np_root, 'train')
+        test_dir = os.path.join(events_np_root, 'test')
+        os.mkdir(train_dir)
+        os.mkdir(test_dir)
+        print(f'Mkdir [{train_dir, test_dir}.')
         #subfolders name corresponds to the labels
         labels = [it.name for it in os.scandir(aedats_directories) if it.is_dir()] 
         for label in labels:
-            os.mkdir(os.path.join(data_dir, label))
-        print(f'Mkdir {os.listdir(data_dir)} in [{data_dir}].')
+            os.mkdir(os.path.join(train_dir, label))
+            os.mkdir(os.path.join(test_dir, label))
+        print(f'Mkdir {os.listdir(train_dir)} in [{train_dir}] and {os.listdir(test_dir)} in [{test_dir}].')
 
-        # use multi-thread to accelerate
-        t_ckp = time.time()
-        with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
-            print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
 
-            for label in labels:
-                aedat_dir = os.path.join(aedats_directories,label)
-                output_dir = os.path.join(data_dir, label)
-                for fname in os.listdir(aedat_dir):
-                    if fname.endswith('.aedat'):
-                        aedat_file = os.path.join(aedat_dir, fname)
-                        #File name without .aedat
+        file_train = os.path.join(aedats_directories,'trials_to_train.txt')
+        file_test = os.path.join(aedats_directories,'trials_to_test.txt')
+        if  (not os.path.exists(file_train)) or (not os.path.exists(file_test)):
+            print('Files to split data doesnt exist. Creating them: ',file_train,' ',file_test)
+            DVSDailyActions.create_traintest_split_file(aedats_directories)
+
+        with open(file_train) as trials_to_train_txt, open(file_test) as trials_to_test_txt:
+            # use multi-thread to accelerate
+            t_ckp = time.time()
+            with ThreadPoolExecutor(max_workers=min(multiprocessing.cpu_count(), configure.max_threads_number_for_datasets_preprocess)) as tpe:
+                random.seed(42)
+                print(f'Start the ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                for line in trials_to_train_txt.readlines():
+                    label, fname = line.strip().split(',')
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedats_directories,label, fname)
                         fname = os.path.splitext(fname)[0]
-                        tpe.submit(DVSDailyActions.split_aedat_files_to_np, fname, aedat_file, output_dir)
+                        output_dir = os.path.join(train_dir,label)
+                        tpe.submit(DVSDailyActions.split_aedat_files_to_np, fname, aedat_file,  output_dir)
 
-
-        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
-        print(f'All aedat files have been split to samples and saved into [{data_dir}].')
+                for line in trials_to_test_txt.readlines():
+                    label, fname = line.strip().split(',')
+                    if fname.__len__() > 0:
+                        aedat_file = os.path.join(aedats_directories,label, fname)
+                        fname = os.path.splitext(fname)[0]
+                        output_dir = os.path.join(test_dir,label)
+                        tpe.submit(DVSDailyActions.split_aedat_files_to_np, fname, aedat_file,  output_dir)
+            print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+        print(f'All aedat files have been split to samples and saved into [{train_dir, test_dir}].')
 
     @staticmethod
     def get_H_W() -> Tuple:

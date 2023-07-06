@@ -24,36 +24,29 @@ torch.backends.mps.deterministic = True
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
-def loading_data(input_data,time_step,splitmeth,tr_tst_split = True):
+def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = True):
     relative_root = os.path.basename(input_data)
     if relative_root == 'DVS_Gesture_dataset':
         train_set = DVS128Gesture(root = input_data, train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth)
         test_set = DVS128Gesture(root = input_data, train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth)
     elif relative_root == 'DVS_Animals_Dataset':
-        data_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        train_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        test_set = DVSAnimals(root = input_data, train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
     elif relative_root == 'DVS_DailyAction_dataset':
-        data_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        train_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        test_set = DVSDailyActions(root = input_data,train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
     elif relative_root == 'DVS_ActionRecog_dataset':
         train_set = DVSActionRecog(root = input_data,train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
         test_set = DVSActionRecog(root = input_data,train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
-    try:
-        num_classes = len(train_set.classes)
-        size_xy = train_set.get_H_W()
-        if tr_tst_split:
-            return train_set,test_set,num_classes,size_xy
-        else: 
-            return ConcatDataset([train_set,test_set]), num_classes, size_xy
-    except:
-        num_classes = len(data_set.classes)
-        size_xy = data_set.get_H_W()
-        if tr_tst_split:
-            labels = [sample[1] for sample in data_set]
-            train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed)
-            return train_set,test_set,num_classes,size_xy
-        else:
-            return data_set, num_classes, size_xy
+    
+    num_classes = len(train_set.classes)
+    size_xy = train_set.get_H_W()
+    if tr_tst_split:
+        return train_set,test_set,num_classes,size_xy
+    else: 
+        return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 def load_net(net_name, n_classes, size_xy):
     if net_name == 'DVSG_net':
@@ -97,8 +90,6 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler):
         
         return train_loss,train_acc
 
-        writer.add_scalar('train_loss', train_loss, epoch)
-        writer.add_scalar('train_acc', train_acc, epoch)
 
 def test_model(net, n_classes,tst_loader,
              optimizer,device,lr_scheduler):
@@ -240,9 +231,6 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             print(out_dir)
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
     
-
-
-
 
 
 
