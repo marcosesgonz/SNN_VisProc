@@ -24,20 +24,28 @@ torch.backends.mps.deterministic = True
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
-def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = True):
+def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50):
     relative_root = os.path.basename(input_data)
     if relative_root == 'DVS_Gesture_dataset':
-        train_set = DVS128Gesture(root = input_data, train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth)
-        test_set = DVS128Gesture(root = input_data, train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth)
+        train_set = DVS128Gesture(root = input_data, train = True, data_type = 'frame', frames_number = time_step, 
+                                  split_by = splitmeth)
+        test_set = DVS128Gesture(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
+                                 split_by = splitmeth)
     elif relative_root == 'DVS_Animals_Dataset':
-        train_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
-        test_set = DVSAnimals(root = input_data, train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        train_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step,
+                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+        test_set = DVSAnimals(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
+                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
     elif relative_root == 'DVS_DailyAction_dataset':
-        train_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
-        test_set = DVSDailyActions(root = input_data,train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        train_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
+                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+        test_set = DVSDailyActions(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
+                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
     elif relative_root == 'DVS_ActionRecog_dataset':
-        train_set = DVSActionRecog(root = input_data,train = True, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
-        test_set = DVSActionRecog(root = input_data,train = False, data_type = 'frame', frames_number = time_step, split_by = splitmeth) 
+        train_set = DVSActionRecog(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
+                                    split_by = splitmeth, factor_tau=tau_factor,scale_factor=scale_factor) 
+        test_set = DVSActionRecog(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
+                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
     
@@ -115,12 +123,14 @@ def test_model(net, n_classes,tst_loader,
 
 def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
                         device = 'mps',lr = 0.1, inp_data= data_dir, 
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True):
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
+                        factor_tau = 0.8 , scale_factor = 50):
     
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T,
-                                                         splitmeth = splitby,tr_tst_split = split_tr_tst)
+                                                         splitmeth = splitby,tr_tst_split = split_tr_tst,
+                                                         tau_factor = factor_tau,scale_factor= scale_factor)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
@@ -141,6 +151,9 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             learning_rate=lr,
             dataset=relative_root,
             architecture=net_name)
+        if splitby == 'exp_decay':
+            hyperparameters['tau factor'] = factor_tau
+            hyperparameters['scale factor'] = scale_factor
         resume_ = None
 
     project_ref = input('Introducir el proyecto(fijarse en los que ya hay en wandb):')

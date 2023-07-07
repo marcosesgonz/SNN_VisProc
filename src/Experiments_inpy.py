@@ -27,7 +27,11 @@ if __name__ == '__main__':
     elif dataset == 'ActRec':
         dataset = data_actrec 
     timestep_ = int(inputdata('Time step (default = 16): ', 16))
-    split_strat = inputdata('Split strategy (number(default) / time ): ', 'number')
+    split_strat = inputdata('Split strategy (number(default) / time/ exp_decay ): ', 'number')
+    tau_factor,scale_factor = None, None
+    if split_strat == 'exp_decay':
+        tau_factor = float(inputdata('Time step (default = 16): ', 0.8))
+        scale_factor = int(inputdata('Time step (default = 16): ', 50))
     epochs_ = int(inputdata('Número de épocas (default = 50): ', 50)) 
     batch_size_ = int(inputdata('Tamaño de lote (default 8): ', 8))
     learning_rate_ = float(inputdata('Set learning rate (default = 0.1): ', 0.1))
@@ -41,5 +45,7 @@ if __name__ == '__main__':
                                     lr = learning_rate_,
                                     device = device_,
                                     net_name=netname,
-                                    run_id = runid_)
+                                    run_id = runid_,
+                                    factor_tau= tau_factor,
+                                    scale_factor= scale_factor)
     
