@@ -10,6 +10,7 @@ import os
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import time
+import event_integration_to_frame
 from spikingjelly import configure
 from spikingjelly.datasets import np_savez
 import struct
@@ -30,6 +31,8 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            factor_tau: float = 1.5,
+            scale_factor: int = 50
     ) -> None:
         '''
         :param root: root path of the dataset
@@ -42,7 +45,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
         :type data_type: str
         :param frames_number: the integrated frame number
         :type frames_number: int
-        :param split_by: `time` or `number`
+        :param split_by: `time` or `number` or 'exp_decay'
         :type split_by: str
         :param duration: the time duration of each frame
         :type duration: int
@@ -172,8 +175,12 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
         elif data_type == 'frame':
             if frames_number is not None:
                 assert frames_number > 0 and isinstance(frames_number, int)
-                assert split_by == 'time' or split_by == 'number'
-                frames_np_root = os.path.join(root, f'frames_number_{frames_number}_split_by_{split_by}')
+                assert split_by in ('time', 'number' ,'exp_decay')
+                if split_by == 'exp_decay':
+                    fact_tau = str(factor_tau).replace('.','_')
+                    frames_np_root = os.path.join(root, f'frames_num{frames_number}_splitby_{split_by}_tau{fact_tau}_scale{scale_factor}')
+                else:
+                    frames_np_root = os.path.join(root, f'frames_number_{frames_number}_split_by_{split_by}')
                 if os.path.exists(frames_np_root):
                     print(f'The directory [{frames_np_root}] already exists.')
                 else:
@@ -193,8 +200,11 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                                 for e_file in e_files:
                                     events_np_file = os.path.join(e_root, e_file)
                                     print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
-                                    tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_frames_number, self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W, True)
-
+                                    if split_by == 'time' or split_by == 'number':
+                                        tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_frames_number, self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W, True)
+                                    elif split_by == 'exp_decay':
+                                        tpe.submit(event_integration_to_frame.exp_decay_by_fixed_time, self.load_events_np, events_np_file, output_dir, frames_number, H, W,
+                                                                                                         print_save= True,factor_tau = factor_tau, scale_factor = scale_factor)
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
                 _root = frames_np_root
@@ -361,6 +371,8 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            factor_tau: float = 1.5,
+            scale_factor: int = 50
     ) -> None:
         """
         The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
@@ -396,7 +408,7 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
         for label in labels_load:
             labels_defs[int(label[0]) - 1] = label[1]
         self.classes_def = labels_defs
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
 
 
     @staticmethod
@@ -499,7 +511,7 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
         data_version, data_start = tonic.io.read_aedat_header_from_file(file_name)
         all_events = DVSAnimals.get_aer_events_from_file(file_name, data_version, data_start)
         all_addr = all_events["address"]
-        t = all_events["timeStamp"].astype(np.uint32)  #Añadí el '*1e-3'Tonic daba el tiempo en nanosegunds(mus), por lo que lo paso a microsegundos(us)(QUITADO)
+        t = all_events["timeStamp"].astype(np.uint32)  
 
         x = (all_addr >> 8) & 0x007F
         y = (all_addr >> 1) & 0x007F
@@ -643,6 +655,8 @@ class DVSDailyActions(MyNeuromorphicDatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            factor_tau: float = 1.5,
+            scale_factor: int = 50
     ) -> None:
         """
         The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
@@ -671,7 +685,7 @@ class DVSDailyActions(MyNeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -916,6 +930,8 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            factor_tau: float = 1.5,
+            scale_factor: int = 50
     ) -> None:
         """
         The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
@@ -944,7 +960,7 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
             The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
 
         """
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
     @staticmethod
     def resource_url_md5() -> list:
         '''

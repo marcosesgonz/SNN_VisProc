@@ -230,8 +230,6 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
 
             print(out_dir)
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
-    
-
 
 
 """
