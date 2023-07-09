@@ -30,8 +30,8 @@ if __name__ == '__main__':
     split_strat = inputdata('Split strategy (number(default) / time/ exp_decay ): ', 'number')
     tau_factor,scale_factor = None, None
     if split_strat == 'exp_decay':
-        tau_factor = float(inputdata('Time step (default = 16): ', 0.8))
-        scale_factor = int(inputdata('Time step (default = 16): ', 50))
+        tau_factor = float(inputdata('Tau factor (default = 0.8): ', 0.8))
+        scale_factor = int(inputdata('Scale factor(default = 50): ', 50))
     epochs_ = int(inputdata('Número de épocas (default = 50): ', 50)) 
     batch_size_ = int(inputdata('Tamaño de lote (default 8): ', 8))
     learning_rate_ = float(inputdata('Set learning rate (default = 0.1): ', 0.1))
