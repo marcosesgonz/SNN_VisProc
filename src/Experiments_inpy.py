@@ -26,7 +26,7 @@ if __name__ == '__main__':
         dataset = data_dailyactions
     elif dataset == 'ActRec':
         dataset = data_actrec 
-    DatAug_prob = float(inputdata('Proportion of data augmentation(default = 0, recommeded = 0.5)', 0))
+    DatAug_prob = float(inputdata('Proportion of data augmentation(default = 0, recommeded = 0.5): ', 0))
     timestep_ = int(inputdata('Time step (default = 16): ', 16))
     split_strat = inputdata('Split strategy (number(default) / time/ exp_decay ): ', 'number')
     tau_factor,scale_factor = None, None

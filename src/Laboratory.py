@@ -259,6 +259,7 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             save_max = False
             if test_acc > max_test_acc:
                 max_test_acc = test_acc
+                wandb.run.summary['best_test_accuracy'] = max_test_acc
                 save_max = True
                 
             checkpoint = {
