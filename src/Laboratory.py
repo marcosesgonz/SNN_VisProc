@@ -22,6 +22,7 @@ random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
 torch.backends.mps.deterministic = True
+torch.backends.cuda.deterministic = True
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
@@ -239,7 +240,7 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             print(f'Mkdir {out_dir}.')
 
         writer = SummaryWriter(out_dir, purge_step=start_epoch)
-        
+
         for epoch in range(start_epoch, epochs):
             train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
                                                 optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
@@ -261,7 +262,7 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             save_max = False
             if test_acc > max_test_acc:
                 max_test_acc = test_acc
-                wandb.run.summary['best_test_accuracy'] = max_test_acc
+                wandb.run.summary['max_test_accuracy'] = max_test_acc
                 save_max = True
                 
             checkpoint = {

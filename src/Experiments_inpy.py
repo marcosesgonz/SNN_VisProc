@@ -33,7 +33,7 @@ if __name__ == '__main__':
     if split_strat == 'exp_decay':
         tau_factor = float(inputdata('Tau factor (default = 0.8): ', 0.8))
         scale_factor = int(inputdata('Scale factor(default = 50): ', 50))
-    epochs_ = int(inputdata('Número de épocas (default = 50): ', 50)) 
+    epochs_ = int(inputdata('Número de épocas (default = 60): ', 60)) 
     batch_size_ = int(inputdata('Tamaño de lote (default 8): ', 8))
     learning_rate_ = float(inputdata('Set learning rate (default = 0.1): ', 0.1))
     device_ = inputdata('Device (cuda(default) /mps): ','cuda')
