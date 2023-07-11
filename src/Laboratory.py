@@ -56,6 +56,7 @@ def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = 
         #OJO, EventMix da ya las etiquetas con one_hot encoding al tener que mixear etiquetas para aumentar datos.
         train_set = EventMix(dataset=train_set, num_class = len(train_set.classes),num_mix = 1,
                              beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3) 
+        print('Using data augmentation with %.2f prob'%data_aug_prob)
     if tr_tst_split:
         return train_set,test_set,num_classes,size_xy
     else: 
@@ -238,6 +239,7 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             print(f'Mkdir {out_dir}.')
 
         writer = SummaryWriter(out_dir, purge_step=start_epoch)
+        
         for epoch in range(start_epoch, epochs):
             train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
                                                 optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
