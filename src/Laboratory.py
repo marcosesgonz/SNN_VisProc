@@ -151,10 +151,11 @@ def test_model(net, n_classes,tst_loader,
         test_acc /= test_samples
         return test_loss,test_acc
 
-def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
-                        device = 'mps',lr = 0.1, inp_data= data_dir, 
+def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
+                        epochs = 30,device = 'mps',lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
-                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0):
+                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
+                        ):
     
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
@@ -187,9 +188,6 @@ def execute_experiment_v2(T = 16,splitby = 'number',batch_size = 8, epochs = 30,
             hyperparameters['tau factor'] = factor_tau
             hyperparameters['scale factor'] = scale_factor
         resume_ = None
-
-    project_ref = input('Introducir el proyecto(fijarse en los que ya hay en wandb):')
-    name_experim = input('Introducir el nombre concreto de esta ejecución:')
 
     with wandb.init(project = project_ref, name = name_experim,
                     config = hyperparameters, id = run_id,resume = resume_): 
