@@ -371,9 +371,11 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            factor_tau: float = 0.8,
+            scale_factor: int = 50
     ) -> None:
         assert train is not None
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform)
+        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -525,7 +527,7 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
             custom_integrated_frames_dir_name: str = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
-            factor_tau: float = 1.5,
+            factor_tau: float = 0.8,
             scale_factor: int = 50
     ) -> None:
         """

@@ -449,6 +449,89 @@ class EventMix(Dataset):
         return len(self.dataset)
 
 
+class ContinousEventMix(Dataset):
+        def __init__(self,
+                 data_root,           #Dataset. Dataset[index] debe contenter en la primera posición la imágen y en el segundo la etiqueta
+                 num_class,         #Número de clases
+                 num_mix=1,         #nº instancias a mezclar con la original
+                 beta=1.,           #Coeficiente de la distribución beta para coger el ratio de mezcla
+                 prob=1.0,          #Tiene que ver con la probabilidad de añadir nuevas instancias a la mezcla con la original. Si 1 se añadirán tantas como se especifique en num_mix
+                 indices=None,      #Si indices None la imágen original se puede mezclar con cualquier otra del dataset
+                 noise=0.1,         #Cantidad de ruido a añadir con sal y pimienta(haría falta el paquete brain_cog)
+                 vis=False,         #Devolver las imágenes y máscara si True
+                 gaussian_n=None,   #Número de gaussianas
+                 **kwargs):
+            self.data_root = data_root
+            self.num_class = num_class
+            self.num_mix = num_mix
+            self.beta = beta
+            self.prob = prob
+            self.indices = indices
+            self.noise = noise
+            self.vis = vis
+            self.gaussian_n = gaussian_n
+            print(self.prob, self.gaussian_n, self.beta)
+
+        def __getitem__(self, index):
+            img, lb = self.dataset[index]
+            lb_onehot = onehot(self.num_class, lb)
+
+            shape = img.shape
+            if self.vis:
+                origin = img.clone()
+
+            for _ in range(self.num_mix): 
+                r = np.random.rand(1)
+                if self.beta <= 0 or r > self.prob:
+                    continue
+
+                #generate mixed sample #Calcula la proporción de mezcla con la función beta con los dos coeficientes iguales(para que sea simétrica respecto 0.5)
+                lam = np.random.beta(self.beta, self.beta)  # lam -> remain ratio  
+
+                if self.indices is None:  #Si no se le da un rango de índices, eligirá para mezclar otro dato aleatorio del dataset
+                    rand_index = random.choice(range(len(self))) 
+                else:
+                    rand_index = random.choice(self.indices)
+
+                img2, lb2 = self.dataset[rand_index]
+                lb2_onehot = onehot(self.num_class, lb2)
+                # shape: step, channel, height, width
+                # alpha = np.random.rand()
+                # if alpha < 0.333:
+                # mask = spatio_mask(shape, 1. - lam)
+                # elif alpha > 0.667:
+                # mask = temporal_mask(shape, 1. - lam)
+                # else:
+                # mask = st_mask(shape, 1. - lam)
+                mask = GMM_mask(shape, 1. - lam, self.gaussian_n)
+                # mask = GMM_mask_clip(shape, 1. - lam)
+                # mask = torch.logical_not(mask)
+
+                # lam = 1 - (mask.sum() / np.prod(img.shape))  #  area
+                lam = calc_masked_lam(img, img2, mask)  # count
+                img[mask] = img2[mask]  # count && mask required
+
+                # distance
+                # mix = torch.clone(img)
+                # if self.vis:
+                #     mix[mask] = -img2[mask]
+                #     img2 = -img2
+                # else:
+                #     mix[mask] = img2[mask]
+                # lam = calc_masked_lam_with_difference(img, img2, mix, kernel_size=3)
+                # img = mix
+                if self.noise != 0:
+                    img = mySaltAndPepperNoise(img, self.noise)  #Función implementada por mi
+
+                lb_onehot = lb_onehot * lam + lb2_onehot * (1. - lam)
+
+            if self.vis:
+                return origin, img, img2, mask
+            else:
+                return img, lb_onehot
+
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D

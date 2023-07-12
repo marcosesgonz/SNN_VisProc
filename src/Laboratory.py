@@ -29,24 +29,24 @@ def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = 
     relative_root = os.path.basename(input_data)
     if relative_root == 'DVS_Gesture_dataset':
         train_set = DVS128Gesture(root = input_data, train = True, data_type = 'frame', frames_number = time_step, 
-                                  split_by = splitmeth)
+                                  split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
         test_set = DVS128Gesture(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
-                                 split_by = splitmeth)
+                                 split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
     elif relative_root == 'DVS_Animals_Dataset':
         train_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
         test_set = DVSAnimals(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
-                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
     elif relative_root == 'DVS_DailyAction_dataset':
         train_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
         test_set = DVSDailyActions(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
     elif relative_root == 'DVS_ActionRecog_dataset':
         train_set = DVSActionRecog(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
         test_set = DVSActionRecog(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth,factor_tau=tau_factor,scale_factor=scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
     
