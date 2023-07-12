@@ -283,7 +283,7 @@ def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number',
 
 
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
+                        epochs = 65,gpu = True,lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, kfolds = 5,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
@@ -332,7 +332,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
             torch.cuda.empty_cache()
         net.to(device)
         
-        print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias(promedio) train/test:', data_size*(kfolds-1)/kfolds,'/', data_set/kfolds)
+        print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias(promedio) train/test:', data_size*(kfolds-1)/kfolds,'/', data_size/kfolds)
         
         #Optimizamos con SGD
         optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
@@ -381,7 +381,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                             num_workers = 4,
                             pin_memory = True)
             
-            print('Fold {}'.format(nkfold + 1))
+            print('Fold {}'.format(nkfold))
 
             for epoch in range(epochs_per_fold):
                 train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
@@ -415,7 +415,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                 torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_latest.pth'))
 
                 print(out_dir)
-                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, val_loss ={test_loss: .4f}, val_acc ={test_acc: .4f}, val_test_acc ={max_test_acc: .4f}')    
 
 
 
