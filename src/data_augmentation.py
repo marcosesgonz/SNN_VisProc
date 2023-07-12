@@ -366,7 +366,6 @@ class EventMix(Dataset):
                  vis=False,         #Devolver las imágenes y máscara si True
                  gaussian_n=None,   #Número de gaussianas
                  **kwargs):
-        print('New version2')
         self.dataset = dataset
         self.num_class = num_class
         self.num_mix = num_mix

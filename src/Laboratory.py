@@ -5,8 +5,7 @@ from torch.utils.data import ConcatDataset
 import wandb
 import random
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
-from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog
-from spikingjelly.datasets.dvs128_gesture import DVS128Gesture
+from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from models import myDVSGestureNet, mysew_resnet18
@@ -260,7 +259,7 @@ def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number',
             save_max = False
             if test_acc > max_test_acc:
                 max_test_acc = test_acc
-                wandb.run.summary['max_test_accuracy'] = max_test_acc
+                wandb.run.summary['max_test_acc'] = max_test_acc
                 save_max = True
                 
             checkpoint = {

@@ -29,7 +29,6 @@ def cal_fixed_frames_number_segment_index_by_time(events_t: np.ndarray, frames_n
         j_{l} & = \\mathop{\\arg\\min}\\limits_{k} \\{t_{k} | t_{k} \\geq t_{0} + \\Delta T \\cdot j\\} \\\\
         j_{r} & = \\begin{cases} \\mathop{\\arg\\max}\\limits_{k} \\{t_{k} | t_{k} < t_{0} + \\Delta T \\cdot (j + 1)\\} + 1, & j <  M - 1 \\cr N, & j = M - 1 \\end{cases}
     '''
-    j_l = np.zeros(shape=[frames_num], dtype=int)
     j_r = np.zeros(shape=[frames_num], dtype=int)
     N = events_t.size
 
