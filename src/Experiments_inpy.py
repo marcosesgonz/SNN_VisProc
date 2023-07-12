@@ -36,12 +36,11 @@ if __name__ == '__main__':
     epochs_ = int(inputdata('Número de épocas (default = 60): ', 60)) 
     batch_size_ = int(inputdata('Tamaño de lote (default 8): ', 8))
     learning_rate_ = float(inputdata('Set learning rate (default = 0.1): ', 0.1))
-    device_ = inputdata('Device (cuda(default) /mps): ','cuda')
     project_ref = input('Introducir el proyecto:')
     name_experim = input('Introducir el nombre concreto de esta ejecución:')
 
     Laboratory.execute_experiment_v2(project_ref = project_ref, name_experim = name_experim, run_id = runid_,
                                     inp_data = dataset, T = timestep_, splitby= split_strat, epochs = epochs_,
-                                    batch_size = batch_size_, lr = learning_rate_, device = device_, net_name = netname,
+                                    batch_size = batch_size_, lr = learning_rate_,gpu =True, net_name = netname,
                                     factor_tau= tau_factor, scale_factor = scale_factor, data_aug_prob = DatAug_prob) 
     

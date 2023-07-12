@@ -8,6 +8,7 @@ from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 from models import myDVSGestureNet, mysew_resnet18
 from data_augmentation import EventMix
 import numpy as np
@@ -151,11 +152,14 @@ def test_model(net, n_classes,tst_loader,
         return test_loss,test_acc
 
 def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
-                        epochs = 30,device = 'mps',lr = 0.1, inp_data= data_dir, 
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
-    
+
+    device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
+    print('Using %s as device'% device)
+
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T,
@@ -181,6 +185,7 @@ def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number',
             batch_size=batch_size,
             learning_rate=lr,
             dataset=relative_root,
+            device = device,
             DatAug_probability = data_aug_prob,
             architecture=net_name)
         if splitby == 'exp_decay':
@@ -275,6 +280,145 @@ def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number',
 
             print(out_dir)
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
+
+
+def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
+                        net_name = 'DVSG_net',run_id = None, kfolds = 5,
+                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
+                        ):
+
+    device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
+    print('Using %s as device'% device)
+
+    relative_root = os.path.basename(inp_data)
+    #Carga de datos en función del dataset que se vaya a usar
+    data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T,
+                                                         splitmeth = splitby,tr_tst_split = False,
+                                                         tau_factor = factor_tau,scale_factor= scale_factor,
+                                                         data_aug_prob = data_aug_prob)
+    data_size = len(data_set)
+    #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
+    #Registro en wandb para la monitorización
+    wandb.login()
+    if run_id is not None:
+        hyperparameters = None
+        name_experim = None
+        checkpoint_file = input('Checkpoint file(.kpath) with desired trained model:')
+        resume_ = 'must'
+    else:
+        hyperparameters = dict(epochs=epochs,
+            time_step = T,
+            nclasses = nclasses_,
+            nfolds = kfolds,
+            data_size = data_size,
+            batch_size=batch_size,
+            learning_rate=lr,
+            dataset=relative_root,
+            device = device,
+            DatAug_probability = data_aug_prob,
+            architecture=net_name)
+        if splitby == 'exp_decay':
+            hyperparameters['tau factor'] = factor_tau
+            hyperparameters['scale factor'] = scale_factor
+        resume_ = None
+
+    with wandb.init(project = project_ref, name = name_experim,
+                    config = hyperparameters, id = run_id,resume = resume_): 
+        
+        if device == 'cuda':
+            #Limpió la cache de la GPU
+            torch.cuda.empty_cache()
+        net.to(device)
+        
+        print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias(promedio) train/test:', data_size*(kfolds-1)/kfolds,'/', data_set/kfolds)
+        
+        #Optimizamos con SGD
+        optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
+        #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+
+        #Cargamos los datos si se quiere continuar ejecución
+        if run_id is not None:
+            dicts = torch.load(checkpoint_file)
+            lr_scheduler.load_state_dict(dicts['lr_scheduler'])
+            optimizer.load_state_dict(dicts['optimizer'])
+            net.load_state_dict(dicts['net'])
+            max_test_acc = dicts['max_test_acc']
+            #start_epoch = dicts['epoch'] + 1
+            print('Trained model succesfully loaded')
+
+        root_file = os.path.dirname(__file__)
+        out_dir = os.path.join(root_file,'result_logs',relative_root, f'T{T}_b{batch_size}_lr{lr}_{name_experim}_kf{kfolds}')
+
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+            print(f'Mkdir {out_dir}.')
+        
+        writer = SummaryWriter(out_dir, purge_step = 0)#purge_step = start_epoch
+
+        max_test_acc = -1
+
+        skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
+        labels = [sample[1] for sample in data_set]
+        epochs_per_fold = epochs//kfolds
+        for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = labels)):
+
+            train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
+            test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
+
+            train_data_loader = torch.utils.data.DataLoader(
+                            dataset = data_set, 
+                            batch_size=batch_size,
+                            sampler=train_subsampler,
+                            num_workers = 4,
+                            pin_memory = True)
+            test_data_loader = torch.utils.data.DataLoader(
+                            dataset= data_set,
+                            batch_size=10,
+                            sampler=test_subsampler,
+                            num_workers = 4,
+                            pin_memory = True)
+            
+            print('Fold {}'.format(nkfold + 1))
+
+            for epoch in range(epochs_per_fold):
+                train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
+                                                    optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
+                                                    data_augmented= data_aug_prob!=0)
+                writer.add_scalar('train_loss', train_loss, epoch), writer.add_scalar('train_acc', train_acc, epoch)
+
+                test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
+                                                optimizer = optimizer,device = device, lr_scheduler = lr_scheduler )
+
+                writer.add_scalar('val_loss', test_loss, epoch),writer.add_scalar('val_acc', test_acc, epoch)
+                # Registro de los valores en wandb
+                current_step = nkfold * epochs_per_fold + epoch
+                wandb.log({'train_loss': train_loss, 'train_acc': train_acc,'val_loss': test_loss,'val_acc': test_acc}, step= current_step)
+
+                save_max = False
+                if test_acc > max_test_acc:
+                    max_test_acc = test_acc
+                    wandb.run.summary['max_val_acc'] = max_test_acc
+                    save_max = True
+                    
+                checkpoint = {
+                    'net': net.state_dict(),'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),'epoch': current_step,
+                    'max_val_acc': max_test_acc
+                }
+
+                if save_max:
+                    torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_max.pth'))
+
+                torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_latest.pth'))
+
+                print(out_dir)
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
+
+
+
 
 
 """

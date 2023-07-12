@@ -1,4 +1,4 @@
-import math
+import os
 import numpy as np
 import random
 from torch.utils.data.dataset import Dataset
@@ -155,7 +155,7 @@ def GMM_mask(size, rat, n=None):
         my = np.random.randint(0, size[3])  #Nº aleatorio de todos los posibles valores de y
         # print(mt, mx, my)
         #Se calcula la desviación estándar de la gaussiana s_k. s_k = (st, sx, sy)
-        st = max(np.random.rand(), 0.1) * size[0] * 0.5 #El máximo entre un número aleatorio entre [0,1) y 0.1 multiplicado por la mitad del tamaño de la dimension
+        st = max(np.random.rand(), 0.1) * size[0] * 0.5 #El máximo entre un número aleatorio entre [0,1) y 0.1, multiplicado por la mitad del tamaño de la dimension
         sx = max(np.random.rand(), 0.1) * size[2] * .5
         sy = max(np.random.rand(), 0.1) * size[3] * .5
         # st, sx, sy = size[0], 0000.5 * size[2], 0000.5 * size[3]
@@ -171,6 +171,44 @@ def GMM_mask(size, rat, n=None):
     val = mask.flatten().sort()[0][idx - 1]  #Solo sobrevivirán los términos que sean mayor que val. Y val corresponden al idx'ésimo valor más grande
     return (mask > val).unsqueeze(1).repeat(1, 2, 1, 1)
     # return mask.unsqueeze(1).repeat(1, 2, 1, 1)
+
+
+def ContinousGMM_mask(dict1,dict2, rat, n=None):
+    if n is None:
+        n = np.random.randint(2, 5)   #Número de gaussianas
+    pi = torch.tensor(np.random.rand(n)) #n valores entre 0 y 1 correspondiente a la amplitud de cada gaussiana (ver eq.5 del paper de EventMix)
+    # pi = torch.ones(n) / n
+
+    mask = torch.zeros((size[0], size[2], size[3])) #La máscara serán en las dimensiones T,H y W (no se coge C).
+    t = dict1['t']
+    x = dict1['x']
+    y = dict1['y']
+    x_min, x_max = x.min(), x.max()
+    y_min, y_max = y.min(), y.max()
+    t_min, t_max = t.min(), t.max()
+
+    for p in pi:
+        #Se calcula el punto medio mu_n de la gaussiana: mu_n = (mt,mx,my)
+        mt = np.random.randint(t_min, t_max)  #Nº aleatorio de todos los posbiles pasos temporales
+        mx = np.random.randint(x_min, x_max)  #Nº aleatorio de todos los posibles valores de x
+        my = np.random.randint(y_min, y_max)  #Nº aleatorio de todos los posibles valores de y
+        # print(mt, mx, my)
+        #Se calcula la desviación estándar de la gaussiana s_k. s_k = (st, sx, sy)
+        st = max(np.random.rand(), 0.1) * t_max * 0.5 #El máximo entre un número aleatorio entre [0,1) y 0.1 multiplicado por la mitad del tamaño de la dimension
+        sx = max(np.random.rand(), 0.1) * x_max * .5
+        sy = max(np.random.rand(), 0.1) * y_max * .5
+        # st, sx, sy = size[0], 0000.5 * size[2], 0000.5 * size[3]
+        # Pasamos a calculara ya la gaussiana. 
+        tt = t - mt
+        xx = x - mx
+        yy = y - my
+        #tmp corresponde al exponente de la gaussiana
+        tmp = -((tt ** 2) / (st ** 2) + (xx ** 2) / (sx ** 2) + (yy ** 2) / (sy ** 2)) / 2 
+        mask += p * np.exp(tmp) #Amplitud multiplicada por la exponencial (fórmula final de la gaussiana)
+    #rat(lambda en el artículo) corresponde a la fracción de instancias a coger de la máscara. idx corresponde a lambda*size(X).
+    idx = int(len(t) * rat)  
+    val = mask.flatten().sort()[0][idx - 1]  #Solo sobrevivirán los términos que sean mayor que val. Y val corresponden al idx'ésimo valor más grande
+    return (mask > val).unsqueeze(1).repeat(1, 2, 1, 1)
 
 # FOR EVENT VIS
 # def spatio_mask(size, rat):
@@ -471,7 +509,24 @@ class ContinousEventMix(Dataset):
             self.vis = vis
             self.gaussian_n = gaussian_n
             print(self.prob, self.gaussian_n, self.beta)
-
+        
+        def load_events_np(root: str):
+            '''
+            :param root: root name where there are subfolders with labels. In each subfolder, there are .npz files with the event dict's
+            :return: a dict whose keys are ``['t', 'x', 'y', 'p']`` and values are ``numpy.ndarray``
+            This function defines how to load a sample from `events_np`. In most cases, this function is `np.load`.
+            But for some datasets, e.g., ES-ImageNet, it can be different.
+            '''
+            events_list = []
+            labels = sorted(it.name for it in os.scandir(root) if it.is_dir())
+            for i,label in enumerate(labels):
+                label_subfolder = os.path.join(root,label)
+                for file in os.listdir(label_subfolder):
+                    if file.endswith('.npz'):
+                        root_file = os.path.join(label_subfolder,file)
+                        events_list.append((np.load(root_file),i))           
+            return events_list
+        
         def __getitem__(self, index):
             img, lb = self.dataset[index]
             lb_onehot = onehot(self.num_class, lb)
