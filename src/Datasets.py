@@ -1198,12 +1198,11 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
             tmp = aerdatafh.read(8)
             p += 8
 
-
         events_dict = dict()
-        events_dict['x'] = np.array(x)
-        events_dict['y'] = np.array(y)
-        events_dict['t'] = np.array(ts)
-        events_dict['p'] = np.array(pol) 
+        events_dict['x'] = np.array(x).astype('uint32')
+        events_dict['y'] = np.array(y).astype('uint32')
+        events_dict['t'] = np.array(ts).astype('uint32')
+        events_dict['p'] = np.array(pol).astype('uint32')
 
         return  events_dict                
         

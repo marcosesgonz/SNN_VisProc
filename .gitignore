@@ -13,3 +13,4 @@ data/Actions_Dataset
 src/result_logs
 src/wandb
 src/gifs_*
+src/rpg_e2vid

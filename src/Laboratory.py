@@ -1,21 +1,11 @@
 import torch
-import sys
-import torch.nn.functional as F
-from torch.utils.data import ConcatDataset
 import wandb
 import random
-from spikingjelly.activation_based import functional, surrogate, neuron, layer
-from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold
-from models import myDVSGestureNet, mysew_resnet18
-from data_augmentation import EventMix
 import numpy as np
-import time
 import os
-import datetime
-
+from utils import load_net,loading_data,test_model,train_model,reset_weights
 #set the seed for reproducibility
 seed = 310
 random.seed(seed)
@@ -26,132 +16,8 @@ torch.backends.cuda.deterministic = True
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
-def loading_data(input_data,time_step = 16 ,splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0):
-    relative_root = os.path.basename(input_data)
-    if relative_root == 'DVS_Gesture_dataset':
-        train_set = DVS128Gesture(root = input_data, train = True, data_type = 'frame', frames_number = time_step, 
-                                  split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
-        test_set = DVS128Gesture(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
-                                 split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
-    elif relative_root == 'DVS_Animals_Dataset':
-        train_set = DVSAnimals(root = input_data, train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
-        test_set = DVSAnimals(root = input_data, train = False, data_type = 'frame', frames_number = time_step, 
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
-    elif relative_root == 'DVS_DailyAction_dataset':
-        train_set = DVSDailyActions(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
-        test_set = DVSDailyActions(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
-    elif relative_root == 'DVS_ActionRecog_dataset':
-        train_set = DVSActionRecog(root = input_data,train = True, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
-        test_set = DVSActionRecog(root = input_data,train = False, data_type = 'frame', frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
-    else:
-        raise ValueError('Unknown dataset. Could check name of the folder.')
-    
-    num_classes = len(train_set.classes)
-    size_xy = train_set.get_H_W()
-    if data_aug_prob != 0:
-        #OJO, EventMix da ya las etiquetas con one_hot encoding al tener que mixear etiquetas para aumentar datos.
-        train_set = EventMix(dataset=train_set, num_class = len(train_set.classes),num_mix = 1,
-                             beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3) 
-        print('Using data augmentation with %.2f prob'%data_aug_prob)
-    if tr_tst_split:
-        return train_set,test_set,num_classes,size_xy
-    else: 
-        return ConcatDataset([train_set,test_set]), num_classes, size_xy
-
-
-def load_net(net_name, n_classes, size_xy):
-    if net_name == 'DVSG_net':
-        net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
-    elif net_name == 'resnet18':
-        net = mysew_resnet18(spiking_neuron=neuron.LIFNode,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
-    else:
-        raise ValueError('Unknown arquitecture. Could check posible names. Names gift: ',net_name)
-    #Establecemos las neuronas en modo multipaso
-    functional.set_step_mode(net, 'm') 
-    return net
-
-
-
-def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_augmented = False):
-        net.train()
-        train_loss = 0
-        train_acc = 0
-        train_samples = 0
-        for frame, label in tr_loader: 
-            optimizer.zero_grad()
-            frame = frame.to(device)
-            frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]  IMPORTANT, COULDN'T BE NECESSARY FOR SOME DATASETS
-
-            label = label.to(device)
-
-            if data_augmented:
-                label_onehot = label
-                num_batch_samples = len(label_onehot)      
-            else:
-                label_onehot = F.one_hot(label, n_classes).float()
-                num_batch_samples = label.numel()
-
-            out_fr = net(frame).mean(0)
-            loss = F.mse_loss(out_fr, label_onehot)
-            loss.backward()
-            optimizer.step()
-
-            train_samples += num_batch_samples
-            train_loss += loss.item() * num_batch_samples
-
-            if data_augmented:
-                max_labels, pred_indices = label.topk(k=2, dim=1)  # Índices de los 2 máximos en la dimensión 1
-                _, label_indices = out_fr.topk(k=2, dim=1)
-                correct = 0.
-                for i in range(num_batch_samples):
-                    if max_labels[i,0] == 1: #Si esto pasa, significa que la etiqueta de la instancia está bien definida con una etiqueta
-                        if pred_indices[i,0] == label_indices[i,0]:
-                            correct += 1.
-                    else:
-                        if torch.all(pred_indices[i,:] == pred_indices[i,:]):
-                            correct += 1.
-
-                train_acc += correct
-            else:
-                train_acc += (out_fr.argmax(1) == label).float().sum().item() #Con argmax en la dimensión 1(.argmax(1)) estoy deshaciendo el onehot para cada etiqueta del batch 
-
-            functional.reset_net(net)           #DUDA ¿Por qué no se resetean los pesos después de cada instancia en lugar después de haber pasado todo el batch?
-
-        train_loss /= train_samples
-        train_acc /= train_samples
-        lr_scheduler.step()
-        
-        return train_loss,train_acc
-
-
-def test_model(net, n_classes,tst_loader,
-             optimizer,device,lr_scheduler):
-        net.eval()
-        test_loss = 0
-        test_acc = 0
-        test_samples = 0
-        with torch.no_grad():
-            for frame, label in tst_loader:
-                frame = frame.to(device)
-                frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
-                label = label.to(device)
-                label_onehot = F.one_hot(label, n_classes).float()
-                out_fr = net(frame).mean(0)
-                loss = F.mse_loss(out_fr, label_onehot)
-                test_samples += label.numel()
-                test_loss += loss.item() * label.numel()
-                test_acc += (out_fr.argmax(1) == label).float().sum().item()
-                functional.reset_net(net)
-        test_loss /= test_samples
-        test_acc /= test_samples
-        return test_loss,test_acc
-
-def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
+#Data:80% train and 20% test
+def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
@@ -283,9 +149,9 @@ def execute_experiment_v2(project_ref, name_experim, T = 16, splitby = 'number',
 
 
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
-                        epochs = 65,gpu = True,lr = 0.1, inp_data= data_dir, 
-                        net_name = 'DVSG_net',run_id = None, kfolds = 5,
-                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
+                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, net_name = 'DVSG_net',
+                        run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
+                        data_aug_prob = 0, nworkers =2, pinmemory = True
                         ):
 
     device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
@@ -298,8 +164,6 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                                                          tau_factor = factor_tau,scale_factor= scale_factor,
                                                          data_aug_prob = data_aug_prob)
     data_size = len(data_set)
-    #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -330,92 +194,71 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         if device == 'cuda':
             #Limpió la cache de la GPU
             torch.cuda.empty_cache()
-        net.to(device)
         
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias(promedio) train/test:', data_size*(kfolds-1)/kfolds,'/', data_size/kfolds)
         
-        #Optimizamos con SGD
-        optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
-        #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
-
-        #Cargamos los datos si se quiere continuar ejecución
-        if run_id is not None:
-            dicts = torch.load(checkpoint_file)
-            lr_scheduler.load_state_dict(dicts['lr_scheduler'])
-            optimizer.load_state_dict(dicts['optimizer'])
-            net.load_state_dict(dicts['net'])
-            max_test_acc = dicts['max_test_acc']
-            #start_epoch = dicts['epoch'] + 1
-            print('Trained model succesfully loaded')
-
         root_file = os.path.dirname(__file__)
         out_dir = os.path.join(root_file,'result_logs',relative_root, f'T{T}_b{batch_size}_lr{lr}_{name_experim}_kf{kfolds}')
 
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
             print(f'Mkdir {out_dir}.')
-        
-        writer = SummaryWriter(out_dir, purge_step = 0)#purge_step = start_epoch
 
-        max_test_acc = -1
-
+        # For fold results
+        results = {}
+        for str in ['val_loss','val_acc','train_loss','train_acc']:
+            results[str] = []
         skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
-        labels = [sample[1] for sample in data_set]
-        epochs_per_fold = epochs//kfolds
-        for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = labels)):
+        for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
+            print('Fold {}'.format(nkfold))
+            #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
+            net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
+            net.apply(reset_weights)
+            net.to(device)
+            #Optimizamos con SGD
+            optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
+            #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
+            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
             test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
 
             train_data_loader = torch.utils.data.DataLoader(
-                            dataset = data_set, 
-                            batch_size=batch_size,
-                            sampler=train_subsampler,
-                            num_workers = 4,
-                            pin_memory = True)
+                            dataset = data_set, batch_size = batch_size,
+                            sampler = train_subsampler, num_workers = nworkers,
+                            drop_last = True, pin_memory = pinmemory)
             test_data_loader = torch.utils.data.DataLoader(
-                            dataset= data_set,
-                            batch_size=10,
-                            sampler=test_subsampler,
-                            num_workers = 4,
-                            pin_memory = True)
+                            dataset = data_set, batch_size = batch_size,
+                            sampler = test_subsampler, num_workers = nworkers,
+                            drop_last = False, pin_memory = pinmemory)
             
-            print('Fold {}'.format(nkfold))
-
-            for epoch in range(epochs_per_fold):
+            for epoch in range(epochs):
                 train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
                                                     optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
                                                     data_augmented= data_aug_prob!=0)
-                writer.add_scalar('train_loss', train_loss, epoch), writer.add_scalar('train_acc', train_acc, epoch)
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}')
+                wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc}, step= epochs)
+            
+            print('Training process has finished. Saving trained model and testing.')
+            checkpoint = {
+                'net': net.state_dict(),'optimizer': optimizer.state_dict(),'lr_scheduler': lr_scheduler.state_dict(),'epoch': epochs}
+            torch.save(checkpoint, os.path.join(out_dir, f'checkpoint_fold{nkfold}.pth'))
 
-                test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
+            test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
                                                 optimizer = optimizer,device = device, lr_scheduler = lr_scheduler )
+            
+            results['val_acc'].append(test_acc)
+            results['val_loss'].append(test_loss)
+            results['train_acc'].append(train_acc)
+            results['train_loss'].append(train_loss)
 
-                writer.add_scalar('val_loss', test_loss, epoch),writer.add_scalar('val_acc', test_acc, epoch)
-                # Registro de los valores en wandb
-                current_step = nkfold * epochs_per_fold + epoch
-                wandb.log({'train_loss': train_loss, 'train_acc': train_acc,'val_loss': test_loss,'val_acc': test_acc}, step= current_step)
+            # Registro de los valores en wandb
+            wandb.log({'train_loss': train_loss, 'train_acc': train_acc,'val_loss': test_loss,'val_acc': test_acc}, step= nkfold)
 
-                save_max = False
-                if test_acc > max_test_acc:
-                    max_test_acc = test_acc
-                    wandb.run.summary['max_val_acc'] = max_test_acc
-                    save_max = True
-                    
-                checkpoint = {
-                    'net': net.state_dict(),'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),'epoch': current_step,
-                    'max_val_acc': max_test_acc
-                }
-
-                if save_max:
-                    torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_max.pth'))
-
-                torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_latest.pth'))
-
-                print(out_dir)
-                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, val_loss ={test_loss: .4f}, val_acc ={test_acc: .4f}, val_test_acc ={max_test_acc: .4f}')    
+        wandb.run.summary['mean_val_acc'] = np.mean(results['val_acc'])
+        wandb.run.summary['mean_val_loss'] = np.mean(results['val_loss'])
+        wandb.run.summary['mean_train_acc'] = np.mean(results['train_acc'])
+        wandb.run.summary['mean_train_loss'] = np.mean(results['train_loss'])
 
 
 
