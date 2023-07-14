@@ -1,0 +1,4 @@
+Ensure to quit the following corrupted files from extract!!!!
+waving/chenjieneng_10.1.aedat
+jumping/miaoshu_5.1.aedat
+jumping/liuxingbo_5.3.aedat
