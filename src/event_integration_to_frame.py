@@ -2,8 +2,10 @@ from spikingjelly import datasets as sjds
 from typing import Callable, Dict, Optional, Tuple
 import numpy as np
 import os
+import warnings
 from spikingjelly.datasets import configure
 np_savez = np.savez_compressed if configure.save_datasets_compressed else np.savez
+warnings.filterwarnings("always", category=UserWarning, message='Detected a time step with no events within.')
 
 def exp_decay_func(amp,t,t_now,tau):
     """
@@ -13,7 +15,7 @@ def exp_decay_func(amp,t,t_now,tau):
     outp = amp * np.exp((t-t_now)/tau)
     return outp
 
-def cal_fixed_frames_number_segment_index_by_time(events_t: np.ndarray, frames_num: int) -> tuple:
+def mycal_fixed_frames_number_segment(events_t: np.ndarray, split_by: str, frames_num: int) -> tuple:
     '''
     :param events_t: events' t
     :type events_t: numpy.ndarray
@@ -31,20 +33,54 @@ def cal_fixed_frames_number_segment_index_by_time(events_t: np.ndarray, frames_n
     '''
     j_r = np.zeros(shape=[frames_num], dtype=int)
     N = events_t.size
+    
+    if split_by == 'number':
+        j_l = np.zeros(shape=[frames_num], dtype=int)
+        di = N // frames_num
+        for i in range(frames_num):
+            j_l[i] = i * di
+            j_r[i] = j_l[i] + di
+        j_r[-1] = N
+        return j_l,j_r
 
-    dt = (events_t[-1] - events_t[0]) // frames_num
-    idx = np.arange(N)
-    for i in range(frames_num):
-        #t_l = dt * i + events_t[0]
-        t_r = events_t[0] + dt*(i +1)
-        mask = np.logical_and(events_t >= events_t[0], events_t < t_r)
-        idx_masked = idx[mask]
-        if i == 0:
-            j_l_0 = idx_masked[0]
-        j_r[i] = idx_masked[-1] + 1
+    elif split_by == 'time':
+        j_l = np.zeros(shape=[frames_num], dtype=int)
+        dt = (events_t[-1] - events_t[0]) // frames_num
+        print(f't_0: {events_t[0]}, t_fin: {events_t[-1]}')
+        idx = np.arange(N)
+        for i in range(frames_num):
+            t_l = dt * i + events_t[0]
+            t_r = t_l + dt
+            mask = np.logical_and(events_t >= t_l, events_t < t_r)
+            print(f' t_i:  {t_l}, t_fi: {t_r} ', np.all(mask ==False))
+            idx_masked = idx[mask]
+            if len(idx_masked) == 0:    #Este if es añadido por mi. 
+                warnings.warn('Detected a time step with no events within.',UserWarning)
+                j_l[i] = j_r[i-1]
+                j_r[i] = j_l[i]
+            else:
+                j_l[i] = idx_masked[0]
+                j_r[i] = idx_masked[-1] + 1
 
-    j_r[-1] = N
-    return j_l_0, j_r, dt
+        j_r[-1] = N  
+        return j_l, j_r
+    
+    elif split_by == 'exp_decay':
+        dt = (events_t[-1] - events_t[0]) // frames_num
+        idx = np.arange(N)
+        for i in range(frames_num):
+            #t_l = dt * i + events_t[0]
+            t_r = events_t[0] + dt*(i +1)
+            mask = np.logical_and(events_t >= events_t[0], events_t < t_r)
+            idx_masked = idx[mask]
+            if i == 0:
+                j_l_0 = idx_masked[0]
+            j_r[i] = idx_masked[-1] + 1
+
+        j_r[-1] = N
+        return j_l_0, j_r, dt
+    else:
+        raise NotImplementedError
 
 def leave_last_xyp_values_in_time(x,y,p):
     #np.unique puede devolver los índices de las primeras apariciones de los valores. Le doy la vuelta al array para obtener las posiciones de los últimos. Estas posiciones estarán 'invertidas'
@@ -53,7 +89,7 @@ def leave_last_xyp_values_in_time(x,y,p):
     positions = len(x) - 1 - positions_inverted
     return uniq_values,positions
 
-def integrate_events_segment_to_frame(t: np.ndarray, x: np.ndarray, y: np.ndarray, p: np.ndarray, H: int, W: int,
+def integrate_events_segment_to_frame_bydecay(t: np.ndarray, x: np.ndarray, y: np.ndarray, p: np.ndarray, H: int, W: int,
                                        j_l_0: int = 0, j_r: int = -1,dt:float = 1e6,factor_tau: float = 1.5, scale_factor: int = 50) -> np.ndarray:
     '''
     :param x: x-coordinate of events
@@ -91,7 +127,7 @@ def integrate_events_segment_to_frame(t: np.ndarray, x: np.ndarray, y: np.ndarra
     return frame_decayed
 
 
-def integrate_events_by_fixed_frames_number_bydecay(events: Dict, frames_num: int, H: int, W: int, factor_tau: float = 1.5, scale_factor: int = 50) -> np.ndarray:
+def myintegrate_events_by_fixed_frames_number(events: Dict, split_by: str, frames_num: int, H: int, W: int, factor_tau: float = 0.8, scale_factor: int = 50) -> np.ndarray:
     '''
     :param events: a dict whose keys are ``['t', 'x', 'y', 'p']`` and values are ``numpy.ndarray``
     :type events: Dict
@@ -106,20 +142,27 @@ def integrate_events_by_fixed_frames_number_bydecay(events: Dict, frames_num: in
     Integrate events to frames by fixed frames number. 
     '''
     t, x, y, p = (events[key] for key in ('t', 'x', 'y', 'p'))
-    #Putting time from us to s.(ASUMING TIME IN US(MICROSECONDS))
-    #t *= 1e-6
-    j_l_0, j_r, dt = cal_fixed_frames_number_segment_index_by_time(t, frames_num)
+    #Putting time from us to ms.(ASUMING TIME IN US(MICROSECONDS)) (Avoid memmory leakage)
+    #t = t*1e-3
+    if split_by == 'exp_decay':
+        j_l_0, j_r, dt = mycal_fixed_frames_number_segment(events_t = t, split_by = split_by, frames_num = frames_num)
+    else:
+        j_l, j_r = mycal_fixed_frames_number_segment(events_t = t, split_by = split_by, frames_num = frames_num)
+
     frames = np.zeros([frames_num, 2, H, W]).astype('int')
-    for i in range(frames_num):
-       frames[i] = integrate_events_segment_to_frame(t = t, x = x, y = y, p = p, H = H, W = W, j_l_0 = j_l_0, j_r = j_r[i],
+    for i in range(frames_num):  
+        if split_by == 'exp_decay':
+            frames[i] = integrate_events_segment_to_frame_bydecay(t = t, x = x, y = y, p = p, H = H, W = W, j_l_0 = j_l_0, j_r = j_r[i],
                                                       dt = dt, factor_tau = factor_tau, scale_factor = scale_factor)
+        else:
+            frames[i] = sjds.integrate_events_segment_to_frame(x, y, p, H, W, j_l[i], j_r[i])
+                
     return frames
 
-
-def exp_decay_by_fixed_time(loader: Callable, events_np_file: str, output_dir: str, frames_num: int, H: int, W: int,
-                             print_save: bool = False,factor_tau:float = 1.5, scale_factor:int = 50) -> None:
+#A continuation of integrate_events_file_to_frames_file_by_fixed_frames_number
+def integrate_events_to_frame_wfixed_frames_num(loader: Callable, events_np_file: str, output_dir: str, split_by: str, frames_num: int, H: int, W: int,
+                                                                print_save: bool = False, factor_tau: float = 0.8, scale_factor: int = 50) -> None:
     fname = os.path.join(output_dir, os.path.basename(events_np_file))
-    np_savez(fname, frames=integrate_events_by_fixed_frames_number_bydecay(loader(events_np_file), frames_num, H, W, factor_tau, scale_factor))
+    np_savez(fname, frames=myintegrate_events_by_fixed_frames_number(loader(events_np_file),split_by, frames_num, H, W, factor_tau, scale_factor))
     if print_save:
         print(f'Frames [{fname}] saved.')
-    return None

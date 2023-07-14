@@ -19,8 +19,8 @@ turning around,chenjieneng_8.3.aedat
 waving,xiaohuang_10.1.aedat
 waving,miaoshu_10.3.aedat
 waving,zhangliming_10.1.aedat
-waving,ningxiangyu_10.3.aedat
-waving,xiaohuang_10.2.aedat
+waving,ziyang_10.1.aedat
+waving,tanglixuan_10.3.aedat
 waving,kaibo_10.1.aedat
 throwing,tanglixuan_7.3.aedat
 throwing,houjing_7.1.aedat
@@ -46,14 +46,14 @@ arm crossing,chenjieneng_1.2.aedat
 arm crossing,liuxingbo_1.3.aedat
 arm crossing,xiaohuang_1.1.aedat
 arm crossing,xiaohuang_1.2.aedat
+jumping,liuxingbo_5.2.aedat
 jumping,kaibo_5.2.aedat
-jumping,xiaohuang_5.2.aedat
-jumping,ziyang_5.1.aedat
-jumping,chenjieneng_5.1.aedat
+jumping,zhangliming_5.3.aedat
+jumping,xiaohuang_5.3.aedat
 jumping,liuxingbo_5.1.aedat
-sit-down,kaibo_6.3.aedat
-sit-down,tanglixuan_6.3.aedat
-sit-down,xiaohuang_6.1.aedat
-sit-down,zhangliming_6.1.aedat
-sit-down,liuxingbo_6.1.aedat
 sit-down,ningxiangyu_6.1.aedat
+sit-down,xiaohuang_6.3.aedat
+sit-down,ziyang_6.3.aedat
+sit-down,ziyang_6.1.aedat
+sit-down,chnejieneng_6.1.aedat
+sit-down,liuxingbo_6.1.aedat

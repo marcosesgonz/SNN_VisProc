@@ -200,11 +200,9 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                                 for e_file in e_files:
                                     events_np_file = os.path.join(e_root, e_file)
                                     print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
-                                    if split_by == 'time' or split_by == 'number':
-                                        tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_frames_number, self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W, True)
-                                    elif split_by == 'exp_decay':
-                                        tpe.submit(event_integration_to_frame.exp_decay_by_fixed_time, self.load_events_np, events_np_file, output_dir, frames_number, H, W,
-                                                                                                         print_save= True,factor_tau = factor_tau, scale_factor = scale_factor)
+                                    tpe.submit(event_integration_to_frame.integrate_events_to_frame_wfixed_frames_num,
+                                                self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W,print_save= True,
+                                                factor_tau = factor_tau, scale_factor = scale_factor)
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
                 _root = frames_np_root
