@@ -8,21 +8,25 @@ import os
 from utils import load_net,loading_data,test_model,train_model,reset_weights
 #set the seed for reproducibility
 seed = 310
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.backends.mps.deterministic = True
-torch.backends.cuda.deterministic = True
+def set_seed():
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.mps.deterministic = True
+    torch.backends.cuda.deterministic = True
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
+def randnumber():
+    set_seed()
+    return np.random.randn(2)
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
-
+    set_seed()
     device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
     print('Using %s as device'% device)
 
@@ -71,16 +75,16 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             batch_size=batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=4,
-            pin_memory=True
+            #num_workers=0,
+            pin_memory=False
         )
         test_data_loader = torch.utils.data.DataLoader(
             dataset=test_set,
             batch_size=batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=4,
-            pin_memory=True
+           # num_workers=0,
+            pin_memory=False
         )
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias train/test:', train_size_,'/', test_size_)
         #Optimizamos con SGD
@@ -153,7 +157,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
                         data_aug_prob = 0, nworkers =2, pinmemory = True
                         ):
-
+    set_seed()
     device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
     print('Using %s as device'% device)
 
