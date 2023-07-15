@@ -75,16 +75,16 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             batch_size=batch_size,
             shuffle=True,
             drop_last=True,
-            #num_workers=0,
-            pin_memory=False
+            num_workers = 2,
+            pin_memory=True
         )
         test_data_loader = torch.utils.data.DataLoader(
             dataset=test_set,
             batch_size=batch_size,
             shuffle=True,
             drop_last=False,
-           # num_workers=0,
-            pin_memory=False
+            num_workers = 2,
+            pin_memory=True
         )
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias train/test:', train_size_,'/', test_size_)
         #Optimizamos con SGD
