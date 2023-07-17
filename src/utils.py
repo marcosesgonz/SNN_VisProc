@@ -56,7 +56,7 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name, n_classes, size_xy):
+def load_net(net_name, n_classes, size_xy, cupy = False):
     if net_name == 'DVSG_net':
         net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
     elif net_name == 'resnet18':
@@ -64,7 +64,10 @@ def load_net(net_name, n_classes, size_xy):
     else:
         raise ValueError('Unknown arquitecture. Could check posible names. Names gift: ',net_name)
     #Establecemos las neuronas en modo multipaso
-    functional.set_step_mode(net, 'm') 
+    functional.set_step_mode(net, 'm')
+    if cupy:
+        functional.set_backend(net, 'cupy', instance=neuron.LIFNode)
+        print('Using cupy in backend')
     return net
 
 def reset_weights(m):

@@ -19,7 +19,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, cupy = False, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
@@ -35,7 +35,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
                                                          data_aug_prob = data_aug_prob)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, cupy = cupy)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
