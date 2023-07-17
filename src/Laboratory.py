@@ -17,11 +17,8 @@ def set_seed():
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
-def randnumber():
-    set_seed()
-    return np.random.randn(2)
 #Data:80% train and 20% test
-def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
+def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, 
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
@@ -32,7 +29,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
-    train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T,
+    train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
                                                          splitmeth = splitby,tr_tst_split = split_tr_tst,
                                                          tau_factor = factor_tau,scale_factor= scale_factor,
                                                          data_aug_prob = data_aug_prob)

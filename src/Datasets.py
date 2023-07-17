@@ -16,6 +16,7 @@ from spikingjelly.datasets import np_savez
 import struct
 import tonic
 import random
+import subprocess
 
 #Class of spikingjelly edited by me in only 3 lines to avoid problems.
 class MyNeuromorphicDatasetFolder(DatasetFolder):
@@ -275,7 +276,42 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
 
             else:
                 raise ValueError('At least one of "frames_number", "duration" and "custom_integrate_function" should not be None.')
+            
+        elif data_type == 'video':
+            if frames_number is not None:
+                assert frames_number > 0 and isinstance(frames_number, int)
+                vid_np_root = os.path.join(root, f'video_number_{frames_number}')
+                if os.path.exists(vid_np_root):
+                    print(f'The directory [{vid_np_root}] already exists.')
+                else:
+                    os.mkdir(vid_np_root)
+                    print(f'Mkdir [{vid_np_root}].')
 
+                    # create the same directory structure
+                    sjds.create_same_directory_structure(events_np_root, vid_np_root)
+                    
+                    src_root = os.path.join( os.path.dirname(os.path.dirname(root)) , 'src')
+                    executor_path = os.path.join(src_root,'my_rpg_e2vid','run_reconstruction.py')
+                    pretrained_model_path = os.path.join(src_root,'my_rpg_e2vid','pretrained','E2VID_lightweight.pth.tar')
+
+                    t_ckp = time.time()
+                    for e_root, e_dirs, e_files in os.walk(events_np_root):
+                            if e_files.__len__() > 0:
+                                output_dir = os.path.join(vid_np_root, os.path.relpath(e_root, events_np_root))
+                                for e_file in e_files:
+                                    if e_file.endswith('.npz'):                 #Esta condición también se podría poner en los otros datatypes. Sin embargo, aquí es especialmente problemático los .DS_Store
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        args = ['-c', pretrained_model_path,'-i', events_np_file, '--output_folder', output_dir, 
+                                                        '--fixed_duration','--time_step', str(frames_number)]
+                                        subprocess.run(['python3',executor_path]+args)
+                    print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+
+            _root = vid_np_root
+            _loader = lambda file_name: np.load(file_name, allow_pickle=True)['video'].astype(np.float32)
+            _transform = transform
+            _target_transform = target_transform
+            
         if train is not None:
             if train:
                 _root = os.path.join(_root, 'train')

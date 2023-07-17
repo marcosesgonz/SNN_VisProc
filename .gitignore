@@ -13,5 +13,5 @@ data/Actions_Dataset
 src/result_logs
 src/wandb
 src/gifs_*
-src/rpg_e2vid
+src/my_rpg_e2vid/pretrained/*.tar
 src/*.gif
