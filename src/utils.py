@@ -11,6 +11,11 @@ from data_augmentation import EventMix
 
 #set the seed for reproducibility
 seed = 310
+try:
+    import cupy as cp
+    cp.random.seed(seed)
+except:
+    cp = None
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -56,17 +61,27 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name, n_classes, size_xy, cupy = False):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False):
+
+    if neuron_type == 'IF':
+        neuron_model = neuron.IFNode
+    elif neuron_type == 'LIF':
+        neuron_model = neuron.LIFNode
+    elif neuron_type == 'PLIF':
+        neuron_model = neuron.ParametricLIFNode
+    else:
+        raise NotImplementedError('Possible values implemented: IF, LIF, PLIF')
+    
     if net_name == 'DVSG_net':
-        net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron=neuron.LIFNode, surrogate_function=surrogate.ATan(), detach_reset=True)
+        net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
     elif net_name == 'resnet18':
-        net = mysew_resnet18(spiking_neuron=neuron.LIFNode,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
+        net = mysew_resnet18(spiking_neuron = neuron_model,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
     else:
         raise ValueError('Unknown arquitecture. Could check posible names. Names gift: ',net_name)
     #Establecemos las neuronas en modo multipaso
     functional.set_step_mode(net, 'm')
     if cupy:
-        functional.set_backend(net, 'cupy', instance=neuron.LIFNode)
+        functional.set_backend(net, 'cupy', instance = neuron_model)
         print('Using cupy in backend')
     return net
 

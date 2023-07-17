@@ -19,7 +19,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, cupy = False, 
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir,  
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
@@ -35,6 +35,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
                                                          data_aug_prob = data_aug_prob)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
+    cupy = True if device == 'cuda' else False
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, cupy = cupy)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -213,7 +214,8 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
             print('Fold {}'.format(nkfold))
             #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-            net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy)
+            cupy = True if device == 'cuda' else False
+            net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, cupy = cupy)
             net.apply(reset_weights)
             net.to(device)
             #Optimizamos con SGD

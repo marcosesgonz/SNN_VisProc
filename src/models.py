@@ -13,7 +13,7 @@ class myDVSGestureNet(nn.Module):
         conv = []
         desired_output = 4
         nconv_blocks = int(np.min(np.log2(np.array(input_sizexy) / desired_output))) #Aquí ponía 5
-        print('Number of conv_blocks:',nconv_blocks)
+        #print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 2
@@ -83,7 +83,7 @@ class myDVSGestureNetANN(nn.Module):
             nn.Linear(512, output_size * 10),   
             nn.ReLU(),
             
-            layer.VotingLayer(10)  
+            nn.AvgPool1d(10,10)
         )
 
     def forward(self, x: torch.Tensor):
