@@ -8,7 +8,14 @@ import os
 from utils import load_net,loading_data,test_model,train_model,reset_weights
 #set the seed for reproducibility
 seed = 310
+try:
+    import cupy as cp
+except:
+    cp = None
+
 def set_seed():
+    if cp != None:
+        cp.random.seed(seed)  
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -19,7 +26,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir,  
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
@@ -30,13 +37,13 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
-                                                         splitmeth = splitby,tr_tst_split = split_tr_tst,
-                                                         tau_factor = factor_tau,scale_factor= scale_factor,
+                                                         splitmeth = splitby, tr_tst_split = split_tr_tst,
+                                                         tau_factor = factor_tau, scale_factor = scale_factor,
                                                          data_aug_prob = data_aug_prob)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
     cupy = True if device == 'cuda' else False
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, cupy = cupy)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -55,6 +62,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             dataset=relative_root,
             device = device,
             DatAug_probability = data_aug_prob,
+            neuron_type = neuron_type,
             architecture=net_name)
         if splitby == 'exp_decay':
             hyperparameters['tau factor'] = factor_tau

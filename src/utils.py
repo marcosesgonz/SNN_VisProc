@@ -71,13 +71,15 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
         neuron_model = neuron.ParametricLIFNode
     else:
         raise NotImplementedError('Possible values implemented: IF, LIF, PLIF')
-    
+    print(f'Using {neuron_type} neurons')
+
     if net_name == 'DVSG_net':
         net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
     elif net_name == 'resnet18':
         net = mysew_resnet18(spiking_neuron = neuron_model,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
     else:
         raise ValueError('Unknown arquitecture. Could check posible names. Names gift: ',net_name)
+    
     #Establecemos las neuronas en modo multipaso
     functional.set_step_mode(net, 'm')
     if cupy:
