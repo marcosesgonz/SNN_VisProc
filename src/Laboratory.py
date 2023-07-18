@@ -157,19 +157,26 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             print(out_dir)
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
 
-
-def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, 
-                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, net_name = 'DVSG_net',
+"""project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
+                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
+                        """
+def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
+                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
-                        data_aug_prob = 0, nworkers =2, pinmemory = True
+                        data_aug_prob = 0, nworkers = 2, pinmemory = True
                         ):
     set_seed()
-    device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
+    device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
+    if device == 'cuda':
+        #Limpió la cache de la GPU
+        torch.cuda.empty_cache()
     print('Using %s as device'% device)
 
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
-    data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T,
+    data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
                                                          splitmeth = splitby,tr_tst_split = False,
                                                          tau_factor = factor_tau,scale_factor= scale_factor,
                                                          data_aug_prob = data_aug_prob)
@@ -192,6 +199,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
             dataset=relative_root,
             device = device,
             DatAug_probability = data_aug_prob,
+            neuron_type = neuron_type,
             architecture=net_name)
         if splitby == 'exp_decay':
             hyperparameters['tau factor'] = factor_tau
@@ -200,10 +208,6 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
 
     with wandb.init(project = project_ref, name = name_experim,
                     config = hyperparameters, id = run_id,resume = resume_): 
-        
-        if device == 'cuda':
-            #Limpió la cache de la GPU
-            torch.cuda.empty_cache()
         
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias(promedio) train/test:', data_size*(kfolds-1)/kfolds,'/', data_size/kfolds)
         
@@ -218,14 +222,17 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         results = {}
         for str in ['val_loss','val_acc','train_loss','train_acc']:
             results[str] = []
+        #Cupy backend if possible
+        cupy = True if device == 'cuda' else False
+        #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
+        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy)
+        net.to(device)
+        #Cross validation of 5 folds
         skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
         for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
             print('Fold {}'.format(nkfold))
-            #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-            cupy = True if device == 'cuda' else False
-            net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, cupy = cupy)
+            print('Reseting wegihts..')
             net.apply(reset_weights)
-            net.to(device)
             #Optimizamos con SGD
             optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
             #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
@@ -258,6 +265,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
             test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
                                                 optimizer = optimizer,device = device, lr_scheduler = lr_scheduler )
             
+            print(f' test_loss_k{nkfold} ={test_loss}, test_acc_k{nkfold} ={test_acc}')
             results['val_acc'].append(test_acc)
             results['val_loss'].append(test_loss)
             results['train_acc'].append(train_acc)
