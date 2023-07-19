@@ -990,7 +990,6 @@ pick,jc12111.aedat
 pick,xd12122.aedat
 pick,hk12224.aedat
 pick,jf12212.aedat
-pick,xd12216.aedat
 pick,gh12112.aedat
 pick,ps12112.aedat
 pick,jf12213.aedat

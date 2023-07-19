@@ -230,9 +230,12 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         #Cross validation of 5 folds
         skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
         for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
-            print('Fold {}'.format(nkfold))
+            print('----------Fold {}-------------'.format(nkfold))
+            #Reseteo los pesos de la red
             print('Reseting wegihts..')
             net.apply(reset_weights)
+            #Reseteo el accuracy máximo en test
+            max_val_acc = 0
             #Optimizamos con SGD
             optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
             #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
@@ -254,26 +257,36 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                 train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
                                                     optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
                                                     data_augmented= data_aug_prob!=0)
-                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}')
-                wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc}, step= epochs)
-            
-            print('Training process has finished. Saving trained model and testing.')
-            checkpoint = {
-                'net': net.state_dict(),'optimizer': optimizer.state_dict(),'lr_scheduler': lr_scheduler.state_dict(),'epoch': epochs}
-            torch.save(checkpoint, os.path.join(out_dir, f'checkpoint_fold{nkfold}.pth'))
-
-            test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
+                val_loss,val_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
                                                 optimizer = optimizer,device = device, lr_scheduler = lr_scheduler )
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_test_acc: .4f}') 
+
+                wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc, f'test_loss_k{nkfold}':val_loss, f'test_acc_k{nkfold}':val_acc}, step = epoch)
+
+                save_max = False
+                if val_acc > max_val_acc:
+                    max_val_acc = val_acc
+                    val_acc_fold = max_val_acc
+                    val_loss_fold = val_loss
+                    train_acc_fold = train_acc
+                    train_loss_fold = train_loss
+                    wandb.run.summary[f'max_val_acc_k{nkfold}'] = max_val_acc
+                    save_max = True
+
+                checkpoint = {'net': net.state_dict(),'optimizer': optimizer.state_dict(),'lr_scheduler': lr_scheduler.state_dict(),'epoch': epoch}
+
+                if save_max:
+                    torch.save(checkpoint, os.path.join(out_dir, f'checkpoint_fold{nkfold}_max.pth')) 
+                
+                torch.save(checkpoint, os.path.join(out_dir, f'checkpoint_fold{nkfold}_latest.pth')) 
             
-            print(f' test_loss_k{nkfold} ={test_loss}, test_acc_k{nkfold} ={test_acc}')
-            results['val_acc'].append(test_acc)
-            results['val_loss'].append(test_loss)
-            results['train_acc'].append(train_acc)
-            results['train_loss'].append(train_loss)
 
-            # Registro de los valores en wandb
-            wandb.log({'train_loss': train_loss, 'train_acc': train_acc,'val_loss': test_loss,'val_acc': test_acc}, step= nkfold)
+            results['val_acc'].append(val_acc_fold)
+            results['val_loss'].append(val_loss_fold)
+            results['train_acc'].append(train_acc_fold)
+            results['train_loss'].append(train_loss_fold)
 
+        #Registro de los valores en wandb
         wandb.run.summary['mean_val_acc'] = np.mean(results['val_acc'])
         wandb.run.summary['mean_val_loss'] = np.mean(results['val_loss'])
         wandb.run.summary['mean_train_acc'] = np.mean(results['train_acc'])

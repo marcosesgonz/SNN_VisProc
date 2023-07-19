@@ -199,11 +199,12 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                             if e_files.__len__() > 0:
                                 output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
                                 for e_file in e_files:
-                                    events_np_file = os.path.join(e_root, e_file)
-                                    print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
-                                    tpe.submit(event_integration_to_frame.integrate_events_to_frame_wfixed_frames_num,
-                                                self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W,print_save= True,
-                                                factor_tau = factor_tau, scale_factor = scale_factor)
+                                    if e_file.endswith('.npz'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(event_integration_to_frame.integrate_events_to_frame_wfixed_frames_num,
+                                                    self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W,print_save= True,
+                                                    factor_tau = factor_tau, scale_factor = scale_factor)
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
                 _root = frames_np_root
@@ -230,9 +231,10 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                             if e_files.__len__() > 0:
                                 output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
                                 for e_file in e_files:
-                                    events_np_file = os.path.join(e_root, e_file)
-                                    print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
-                                    tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_duration, self.load_events_np, events_np_file, output_dir, duration, H, W, True)
+                                    if e_file.endswith('.npz'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_duration, self.load_events_np, events_np_file, output_dir, duration, H, W, True)
 
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
@@ -261,10 +263,10 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                             if e_files.__len__() > 0:
                                 output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
                                 for e_file in e_files:
-                                    events_np_file = os.path.join(e_root, e_file)
-                                    print(
-                                        f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
-                                    tpe.submit(sjds.save_frames_to_npz_and_print, os.path.join(output_dir, os.path.basename(events_np_file)), custom_integrate_function(np.load(events_np_file), H, W))
+                                    if e_file.endswith('.npz'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print( f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(sjds.save_frames_to_npz_and_print, os.path.join(output_dir, os.path.basename(events_np_file)), custom_integrate_function(np.load(events_np_file), H, W))
 
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
@@ -299,7 +301,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                             if e_files.__len__() > 0:
                                 output_dir = os.path.join(vid_np_root, os.path.relpath(e_root, events_np_root))
                                 for e_file in e_files:
-                                    if e_file.endswith('.npz'):                 #Esta condición también se podría poner en los otros datatypes. Sin embargo, aquí es especialmente problemático los .DS_Store
+                                    if e_file.endswith('.npz'):                 
                                         events_np_file = os.path.join(e_root, e_file)
                                         print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
                                         args = ['-c', pretrained_model_path,'-i', events_np_file, '--output_folder', output_dir, 
@@ -1100,31 +1102,7 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
             scale_factor: int = 50
     ) -> None:
         """
-        The DVS Animals dataset, which is proposed by Fully Event-Based Camera.
-
-        Refer to :class:`spikingjelly.datasets.NeuromorphicDatasetFolder` for more details about params information.
-
-
-        .. admonition:: Note
-            :class: note
-
-            There are 1121 samples. See that they are all stored in the train folder.
-
-            .. code-block:: python
-
-                from spikingjelly.datasets import dvs128_gesture
-
-                src_root = os.path.dirname(__file__)
-                data_root = os.path.join(os.path.dirname(src_root),'data')
-                data_animals = os.path.join(data_root,'SLAnimals_Dataset')
-                data_set = DVSAnimals(data_animals,train=True, data_type='frame', frames_number=T, split_by=splitby)
-                labels = [sample[1] for sample in data_set]
-                print('Posible labels:',np.unique(labels))
-                train_set, test_set = train_test_split(data_set, test_size = 0.2,stratify = np.array(labels), random_state = seed) 
-
-            
-            The origin dataset can be split it into train and test set by ``train_test_split()`` from sklearn.
-
+        Images were reduced by half size for convenience.
         """
         super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
     @staticmethod
@@ -1233,8 +1211,8 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
             p += 8
 
         events_dict = dict()
-        events_dict['x'] = np.array(x).astype('uint32')
-        events_dict['y'] = np.array(y).astype('uint32')
+        events_dict['x'] = np.array(x).astype('uint32')//2
+        events_dict['y'] = np.array(y).astype('uint32')//2
         events_dict['t'] = np.array(ts).astype('uint32')
         events_dict['p'] = np.array(pol).astype('uint32')
 
@@ -1355,8 +1333,8 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
     def get_H_W() -> Tuple:
         '''
         :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W` is the weight of the data.
-            For example, this function returns ``(346, 260)`` for the DAVIS346redcolor.
+            For example, this function returns ``(346/2, 260/2)`` for the DAVIS346redcolor(Frame sizes where reduced by half).
             https://www.frontiersin.org/articles/10.3389/fnbot.2019.00038/full
         :rtype: tuple
         '''
-        return 260, 346
+        return 260//2, 346//2
