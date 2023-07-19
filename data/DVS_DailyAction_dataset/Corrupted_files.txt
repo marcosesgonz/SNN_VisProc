@@ -1,0 +1,2 @@
+Ensure to quit the following corrupted files from extract!!!!
+pick/xd12216.aedat

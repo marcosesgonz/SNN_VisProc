@@ -6,6 +6,7 @@ import warnings
 from spikingjelly.datasets import configure
 np_savez = np.savez_compressed if configure.save_datasets_compressed else np.savez
 warnings.filterwarnings("always", category=UserWarning, message='Detected a time step with no events within.')
+warnings.filterwarnings("always", category=UserWarning, message='Detected a time step possibly corrupted. t_min != t[0]')
 
 def exp_decay_func(amp,t,t_now,tau):
     """
@@ -61,6 +62,8 @@ def mycal_fixed_frames_number_segment(events_t: np.ndarray, split_by: str, frame
             else:
                 j_l[i] = idx_masked[0]
                 j_r[i] = idx_masked[-1] + 1
+                if events_t[j_l[i]] != events_t[ j_l[i] : j_r[i]].min():
+                    warnings.warn('Detected a time step possibly corrupted. t_min != t[0]',UserWarning)
 
         j_r[-1] = N  
         return j_l, j_r
@@ -116,7 +119,8 @@ def integrate_events_segment_to_frame_bydecay(t: np.ndarray, x: np.ndarray, y: n
     x = x[j_l_0:j_r]
     y = y[j_l_0:j_r]
     p = p[j_l_0:j_r]
-
+    if t.min() != t[0]:
+        warnings.warn('Detected a time step possibly corrupted. t_min != t[0]',UserWarning)
     #Taking unique (x,y,p) values. Leaving only last values of (x,y,p) if repeated(keeping last in time).
     uniq_values, idx_positions = leave_last_xyp_values_in_time(x,y,p)
     #Asigning time values in x,y,p positions obtained
