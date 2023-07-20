@@ -13,7 +13,7 @@ class myDVSGestureNet(nn.Module):
         conv = []
         desired_output = 4
         nconv_blocks = int(np.min(np.log2(np.array(input_sizexy) / desired_output))) #Aquí ponía 5
-        #print('Number of conv_blocks:',nconv_blocks)
+        print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 2
@@ -49,7 +49,7 @@ class myDVSGestureNet(nn.Module):
         return self.conv_fc(x)
     
 class myDVSGestureNetANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),spiking_neuron: callable = None, **kwargs):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128)):
         super().__init__()
         conv = []
         desired_output = 4
@@ -76,18 +76,31 @@ class myDVSGestureNetANN(nn.Module):
             nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
             nn.Linear(channels * outp_convx * outp_convy, 512), 
-            nn.ReLU(),
+            nn.ReLU()
+        )
+        #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
+        self.gru = nn.GRU(input_size=512, hidden_size=512, num_layers=1, batch_first=True)
 
+        self.classifier = nn.Sequential(
             nn.Dropout(0.5),
-            #La última capa cambia su tamaño en función del número de clases posibles. De esta manera la capa de votación(VotingLayer) la dejamos fijas con 10 neuronas por voto('maxpooling' de 10)
-            nn.Linear(512, output_size * 10),   
+            nn.Linear(512, output_size * 10),
             nn.ReLU(),
-            
-            nn.AvgPool1d(10,10)
+            nn.AvgPool1d(10, 10)
         )
 
     def forward(self, x: torch.Tensor):
-        return self.conv_fc(x)
+        batch_size, num_frames, channels, height, width = x.size()
+        x = x.view(batch_size * num_frames, channels, height, width)
+        x = self.conv_fc(x)
+        x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
+
+        # Pasar los frames secuencialmente a la capa GRU. El estado inicial de la celda GRU h_0 será la que da por defecto(torch.zeros(..))
+        out, hidden = self.gru(x)
+
+        # Utilizar el último estado oculto como entrada para la capa totalmente conectada final
+        out = self.classifier(out[:, -1, :])
+
+        return out
 
 
 #I've changed the input channels of the first conv layer from 3 to 2.
