@@ -60,7 +60,7 @@ class myDVSGestureANN(nn.Module):
         print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
-                in_channels = 2
+                in_channels = 1
             else:
                 in_channels = channels
 
@@ -92,6 +92,7 @@ class myDVSGestureANN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor):
+        x = x.unsqueeze(2)      #Adding the channel dimension since data from e2vid doesnt include it
         batch_size, num_frames, channels, height, width = x.size()
         x = x.view(batch_size * num_frames, channels, height, width)
         x = self.conv_fc(x)

@@ -22,9 +22,6 @@ torch.manual_seed(seed)
 torch.backends.mps.deterministic = True
 torch.backends.cuda.deterministic = True
 
-def load_npz_video(file_name):
-    return np.load(file_name,allow_pickle=True)['video'].astype(np.float32)
-
 
 def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0):
     relative_root = os.path.basename(input_data)

@@ -6,7 +6,6 @@ from spikingjelly import datasets as sjds
 from torchvision.datasets import DatasetFolder
 from sklearn.model_selection import train_test_split
 from torchvision.datasets.utils import extract_archive
-from utils import load_npz_video
 import os
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
@@ -18,6 +17,11 @@ import struct
 import tonic
 import random
 import subprocess
+
+
+def load_npz_video(file_name):
+    return np.load(file_name,allow_pickle=True)['video'].astype(np.float32)
+
 
 #Class of spikingjelly edited by me in only 3 lines to avoid problems.
 class MyNeuromorphicDatasetFolder(DatasetFolder):
