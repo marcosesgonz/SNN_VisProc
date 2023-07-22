@@ -259,7 +259,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                                                     data_augmented= data_aug_prob!=0)
                 val_loss,val_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
                                                     device = device)
-                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_test_acc: .4f}') 
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_val_acc: .4f}') 
 
                 wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc, f'test_loss_k{nkfold}':val_loss, f'test_acc_k{nkfold}':val_acc}, step = epoch)
 
