@@ -6,6 +6,7 @@ from spikingjelly import datasets as sjds
 from torchvision.datasets import DatasetFolder
 from sklearn.model_selection import train_test_split
 from torchvision.datasets.utils import extract_archive
+from utils import load_npz_video
 import os
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
@@ -310,7 +311,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
             _root = vid_np_root
-            _loader = lambda file_name: np.load(file_name, allow_pickle=True)['video'].astype(np.float32)
+            _loader = load_npz_video
             _transform = transform
             _target_transform = target_transform
             
