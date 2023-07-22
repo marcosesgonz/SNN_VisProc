@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
-from models import myDVSGestureNet, mysew_resnet18
+from models import myDVSGestureNet, mysew_resnet18, myDVSGestureANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
 
@@ -63,28 +63,34 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
 
 def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False):
 
-    if neuron_type == 'IF':
-        neuron_model = neuron.IFNode
-    elif neuron_type == 'LIF':
-        neuron_model = neuron.LIFNode
-    elif neuron_type == 'PLIF':
-        neuron_model = neuron.ParametricLIFNode
-    else:
-        raise NotImplementedError('Possible values implemented: IF, LIF, PLIF')
-    print(f'Using {neuron_type} neurons')
+    possible_nets = ['DVSG_net','resnet18','RDVSG_ANN']
+    assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
 
-    if net_name == 'DVSG_net':
-        net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
-    elif net_name == 'resnet18':
-        net = mysew_resnet18(spiking_neuron = neuron_model,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
+    if not net_name.endswith('ANN'):
+        if neuron_type == 'IF':
+            neuron_model = neuron.IFNode
+        elif neuron_type == 'LIF':
+            neuron_model = neuron.LIFNode
+        elif neuron_type == 'PLIF':
+            neuron_model = neuron.ParametricLIFNode
+        else:
+            raise NotImplementedError('Possible values implemented: IF, LIF, PLIF')
+        print(f'Using {neuron_type} neurons')
+
+        if net_name == 'DVSG_net':
+            net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
+        elif net_name == 'resnet18':
+            net = mysew_resnet18(spiking_neuron = neuron_model,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
+
+        #Establecemos las neuronas en modo multipaso
+        functional.set_step_mode(net, 'm')
+        if cupy:
+            functional.set_backend(net, 'cupy', instance = neuron_model)
+            print('Using cupy in backend')
     else:
-        raise ValueError('Unknown arquitecture. Could check posible names. Names gift: ',net_name)
-    
-    #Establecemos las neuronas en modo multipaso
-    functional.set_step_mode(net, 'm')
-    if cupy:
-        functional.set_backend(net, 'cupy', instance = neuron_model)
-        print('Using cupy in backend')
+        if net_name == 'RDVSG_ANN':
+            net = myRDVSGestureANN(output_size = n_classes,input_sizexy=size_xy)
+        
     return net
 
 def reset_weights(m):
@@ -97,16 +103,14 @@ def reset_weights(m):
     print(f'Reset trainable parameters of layer = {layer}')
     layer.reset_parameters()
 
-def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_augmented = False):
+def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler, SNNmodel = True, data_augmented = False):
         net.train()
-        train_loss = 0
-        train_acc = 0
-        train_samples = 0
+        train_loss, train_acc, train_samples = 0, 0, 0
         for frame, label in tr_loader: 
             optimizer.zero_grad()
             frame = frame.to(device)
-            frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]  IMPORTANT, COULDN'T BE NECESSARY FOR SOME DATASETS
-
+            if SNNmodel:
+                frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]  IMPORTANT, COULDN'T BE NECESSARY FOR SOME DATASETS
             label = label.to(device)
 
             if data_augmented:
@@ -116,8 +120,9 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_
                 label_onehot = F.one_hot(label, n_classes).float()
                 num_batch_samples = label.numel()
 
-            out_fr = net(frame).mean(0)
-            loss = F.mse_loss(out_fr, label_onehot)
+ 
+            output = net(frame)       #Firing rate of spiking neurons in all time steps if SNN
+            loss = F.mse_loss(output, label_onehot)
             loss.backward()
             optimizer.step()
 
@@ -126,7 +131,7 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_
 
             if data_augmented:
                 max_labels, pred_indices = label.topk(k=2, dim=1)  # Índices de los 2 máximos en la dimensión 1
-                _, label_indices = out_fr.topk(k=2, dim=1)
+                _, label_indices = output.topk(k=2, dim=1)
                 correct = 0.
                 for i in range(num_batch_samples):
                     if max_labels[i,0] == 1: #Si esto pasa, significa que la etiqueta de la instancia está bien definida con una etiqueta
@@ -138,9 +143,10 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_
 
                 train_acc += correct
             else:
-                train_acc += (out_fr.argmax(1) == label).float().sum().item() #Con argmax en la dimensión 1(.argmax(1)) estoy deshaciendo el onehot para cada etiqueta del batch 
+                train_acc += (output.argmax(1) == label).float().sum().item() #Con argmax en la dimensión 1(.argmax(1)) estoy deshaciendo el onehot para cada etiqueta del batch 
 
-            functional.reset_net(net)           #DUDA ¿Por qué no se resetean los pesos después de cada instancia en lugar después de haber pasado todo el batch?
+            if SNNmodel:
+                functional.reset_net(net)           #DUDA ¿Por qué no se resetean los pesos después de cada instancia en lugar después de haber pasado todo el batch?
 
         train_loss /= train_samples
         train_acc /= train_samples
@@ -150,7 +156,7 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler,data_
 
 
 def test_model(net, n_classes,tst_loader,
-             optimizer,device,lr_scheduler):
+             device,SNNmodel = True):
         net.eval()
         test_loss = 0
         test_acc = 0
@@ -158,15 +164,17 @@ def test_model(net, n_classes,tst_loader,
         with torch.no_grad():
             for frame, label in tst_loader:
                 frame = frame.to(device)
-                frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
+                if SNNmodel:
+                    frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
                 label = label.to(device)
                 label_onehot = F.one_hot(label, n_classes).float()
-                out_fr = net(frame).mean(0)
+                out_fr = net(frame)
                 loss = F.mse_loss(out_fr, label_onehot)
                 test_samples += label.numel()
                 test_loss += loss.item() * label.numel()
                 test_acc += (out_fr.argmax(1) == label).float().sum().item()
-                functional.reset_net(net)
+                if SNNmodel:
+                    functional.reset_net(net)
         test_loss /= test_samples
         test_acc /= test_samples
         return test_loss,test_acc

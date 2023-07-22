@@ -45,12 +45,15 @@ class myDVSGestureNet(nn.Module):
             layer.VotingLayer(10)  
         )
 
-    def forward(self, x: torch.Tensor):
-        return self.conv_fc(x)
+    def forward(self, x: torch.Tensor):  #x.shape = (T, N, C, H, W)
+        x = self.conv_fc(x)
+        x = x.mean(0)
+        return x
     
-class myDVSGestureNetANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128)):
+class myDVSGestureANN(nn.Module):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), recurrence = True):
         super().__init__()
+        self.recurrence = recurrence
         conv = []
         desired_output = 4
         nconv_blocks = int(np.min(np.log2(np.array(input_sizexy) / desired_output))) #Aquí ponía 5
@@ -94,11 +97,13 @@ class myDVSGestureNetANN(nn.Module):
         x = self.conv_fc(x)
         x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
 
-        # Pasar los frames secuencialmente a la capa GRU. El estado inicial de la celda GRU h_0 será la que da por defecto(torch.zeros(..))
-        out, hidden = self.gru(x)
-
-        # Utilizar el último estado oculto como entrada para la capa totalmente conectada final
-        out = self.classifier(out[:, -1, :])
+        if self.recurrence:
+            # Pasar los frames secuencialmente a la capa GRU. El estado inicial de la celda GRU h_0 será la que da por defecto(torch.zeros(..))
+            out, hidden = self.gru(x)
+            # Utilizar el último estado oculto como entrada para la capa totalmente conectada final
+            out = self.classifier(out[:, -1, :])
+        else:
+            out = self.classifier(x).mean(1)  #Da igual hacer el promedio aquí o en el bucle de entrenamiento? Qué busco exactamente con este promedio, un firing rate?
 
         return out
 
