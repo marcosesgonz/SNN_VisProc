@@ -61,9 +61,9 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, recurrence: bool = True):
 
-    possible_nets = ['DVSG_net','resnet18','RDVSG_ANN']
+    possible_nets = ['DVSG_net','resnet18','DVSG_ANN']
     assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
 
     if not net_name.endswith('ANN'):
@@ -88,8 +88,7 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             functional.set_backend(net, 'cupy', instance = neuron_model)
             print('Using cupy in backend')
     else:
-        if net_name == 'RDVSG_ANN':
-            net = myRDVSGestureANN(output_size = n_classes,input_sizexy=size_xy)
+        net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, recurrence = recurrence)
         
     return net
 
@@ -146,7 +145,7 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler, SNNm
                 train_acc += (output.argmax(1) == label).float().sum().item() #Con argmax en la dimensión 1(.argmax(1)) estoy deshaciendo el onehot para cada etiqueta del batch 
 
             if SNNmodel:
-                functional.reset_net(net)           #DUDA ¿Por qué no se resetean los pesos después de cada instancia en lugar después de haber pasado todo el batch?
+                functional.reset_net(net)           
 
         train_loss /= train_samples
         train_acc /= train_samples

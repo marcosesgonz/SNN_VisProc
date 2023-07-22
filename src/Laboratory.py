@@ -27,7 +27,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True,
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, recurrence = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
     set_seed()
@@ -43,7 +43,9 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
     cupy = True if device == 'cuda' else False
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy)
+    SNNmodel = not net_name.endswith('ANN')
+    print('SNN model: ',SNNmodel)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -121,12 +123,12 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 
         for epoch in range(start_epoch, epochs):
             train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
-                                                optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
+                                                optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,SNNmodel = SNNmodel,
                                                 data_augmented= data_aug_prob!=0)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_acc', train_acc, epoch)
 
-            test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
+            test_loss,test_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,SNNmodel = SNNmodel,
                                             device = device)
 
             writer.add_scalar('test_loss', test_loss, epoch)
@@ -165,7 +167,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
                         epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
-                        data_aug_prob = 0, nworkers = 2, pinmemory = True
+                        data_aug_prob = 0, nworkers = 2, pinmemory = True, recurrence = True, 
                         ):
     set_seed()
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
@@ -176,10 +178,8 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
 
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
-    data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
-                                                         splitmeth = splitby,tr_tst_split = False,
-                                                         tau_factor = factor_tau,scale_factor= scale_factor,
-                                                         data_aug_prob = data_aug_prob)
+    data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type, splitmeth = splitby,tr_tst_split = False,
+                                                         tau_factor = factor_tau,scale_factor= scale_factor, data_aug_prob = data_aug_prob)
     data_size = len(data_set)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -225,8 +225,10 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         #Cupy backend if possible
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy)
+        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence)
         net.to(device)
+        SNNmodel = not net_name.endswith('ANN')
+        print('SNN model: ',SNNmodel)
         #Cross validation of 5 folds
         skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
         for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
@@ -255,10 +257,10 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
             
             for epoch in range(epochs):
                 train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
-                                                    optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,
-                                                    data_augmented= data_aug_prob!=0)
+                                                    optimizer = optimizer,device = device, lr_scheduler = lr_scheduler, SNNmodel = SNNmodel,
+                                                    data_augmented = data_aug_prob!=0)
                 val_loss,val_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
-                                                    device = device)
+                                                    device = device, SNNmodel = SNNmodel)
                 print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_val_acc: .4f}') 
 
                 wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc, f'test_loss_k{nkfold}':val_loss, f'test_acc_k{nkfold}':val_acc}, step = epoch)
