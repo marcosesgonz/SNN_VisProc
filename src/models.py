@@ -51,7 +51,7 @@ class myDVSGestureNet(nn.Module):
         return x
     
 class myDVSGestureANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), recurrence = True):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), recurrence = True,softm = True):
         super().__init__()
         self.recurrence = recurrence
         conv = []
@@ -84,17 +84,26 @@ class myDVSGestureANN(nn.Module):
         #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
         self.gru = nn.GRU(input_size=512, hidden_size=512, num_layers=1, batch_first=True)
 
-        self.classifier = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(512, output_size * 10),
-            nn.ReLU(),
-            nn.AvgPool1d(10, 10)
-        )
+        if softm:
+            self.classifier= nn.Sequential(
+                nn.Dropout(0.5),
+                nn.Linear(512, output_size),
+                nn.Softmax(dim = 1)
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Dropout(0.5),
+                nn.Linear(512, output_size * 10),
+                nn.ReLU(),
+                nn.AvgPool1d(10, 10)
+            )
+
 
     def forward(self, x: torch.Tensor):
         x = x.unsqueeze(2)      #Adding the channel dimension since data from e2vid doesnt include it
         batch_size, num_frames, channels, height, width = x.size()
         x = x.view(batch_size * num_frames, channels, height, width)
+        print('input size:',x.size())
         x = self.conv_fc(x)
         x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
 

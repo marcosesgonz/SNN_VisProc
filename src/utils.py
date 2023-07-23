@@ -61,7 +61,7 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, recurrence: bool = True):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, recurrence: bool = True,softm: bool = True):
 
     possible_nets = ['DVSG_net','resnet18','DVSG_ANN']
     assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
@@ -88,7 +88,7 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             functional.set_backend(net, 'cupy', instance = neuron_model)
             print('Using cupy in backend')
     else:
-        net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, recurrence = recurrence)
+        net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, recurrence = recurrence, softm = softm)
         
     return net
 

@@ -27,7 +27,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, recurrence = True,
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, recurrence = True, softm = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
     set_seed()
@@ -45,7 +45,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
     print('SNN model: ',SNNmodel)
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence, softm = softm)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -167,7 +167,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
                         epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
-                        data_aug_prob = 0, nworkers = 2, pinmemory = True, recurrence = True, 
+                        data_aug_prob = 0, nworkers = 2, pinmemory = True, recurrence = True, softm = True
                         ):
     set_seed()
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
@@ -225,7 +225,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         #Cupy backend if possible
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence)
+        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, recurrence = recurrence, softm = softm)
         net.to(device)
         SNNmodel = not net_name.endswith('ANN')
         print('SNN model: ',SNNmodel)
