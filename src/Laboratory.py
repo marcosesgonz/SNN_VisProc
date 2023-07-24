@@ -45,7 +45,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
     print('SNN model: ',SNNmodel)
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -225,7 +225,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         #Cupy backend if possible
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm)
+        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
         net.to(device)
         SNNmodel = not net_name.endswith('ANN')
         print('SNN model: ',SNNmodel)

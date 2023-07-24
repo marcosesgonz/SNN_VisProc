@@ -48,9 +48,11 @@ class myDVSGestureNet(nn.Module):
         x = self.conv_fc(x)
         x = x.mean(0)
         return x
-    
+
+
+
 class myDVSGestureANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = True):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
@@ -101,15 +103,12 @@ class myDVSGestureANN(nn.Module):
         x = self.conv_fc(x)
         x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
         # Promedio entre todos los pasos temporales
-        print('Antes del clasificador',x.size())
         out = self.classifier(x).mean(1)
-        print('Después del clasificador promediando T:',out.size())
         return out
 
 
-
 class myDVSGestureRANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = True):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
@@ -138,16 +137,14 @@ class myDVSGestureRANN(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.5)
         )
-
-        
-        if softm:
-            #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
-            self.gru = nn.GRU(input_size=512, hidden_size = output_size, num_layers=1, batch_first=True)
-            self.classifier= nn.Sequential(      
+        #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
+        self.gru = nn.GRU(input_size=512, hidden_size = output_size * 10, num_layers=2, batch_first=True, dropout = 0.3)
+        if softm:   
+            self.classifier= nn.Sequential(   
+                nn.Linear(output_size * 10, output_size),  
                 nn.Softmax(dim = 1)
             )
         else:
-            self.gru = nn.GRU(input_size=512, hidden_size = output_size * 10, num_layers=1, batch_first=True)
             self.classifier = nn.Sequential(
                 nn.ReLU(),
                 nn.AvgPool1d(10, 10)
@@ -167,6 +164,60 @@ class myDVSGestureRANN(nn.Module):
         out = self.classifier(out[:, -1, :])
 
         return out
+
+
+class myDVSGesture3DANN(nn.Module):
+    def __init__(self, channels = 48, output_size = 11, input_sizexy =(128,128), num_frames = 22, softm = False):
+        super().__init__()
+        conv = []
+        nconv_blocks = 5
+        print('Number of conv_blocks:',nconv_blocks)
+        for i in range(nconv_blocks):
+            if conv.__len__() == 0:
+                in_channels = 1
+            else:
+                in_channels = channels
+
+            conv.append(nn.Conv3d(in_channels, channels, kernel_size=3, padding=1, bias=False))
+            conv.append(nn.Dropout3d(0.3))
+            conv.append(nn.BatchNorm3d(channels))
+            conv.append(nn.ReLU())
+            conv.append(nn.MaxPool3d((1, 2, 2),stride=(1,2,2)))
+
+
+        outp_convx = input_sizexy[0] // (2**nconv_blocks)
+        outp_convy = input_sizexy[1] // (2**nconv_blocks)
+        outp_convz = num_frames
+        #print('output_convs(x,y,z):',outp_convx,outp_convy,outp_convz)
+        self.conv_fc = nn.Sequential(
+            *conv,
+
+            nn.Flatten(),
+            nn.Dropout(0.5),
+            #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
+            nn.Linear(channels * outp_convx * outp_convy * outp_convz, 512), 
+            nn.ReLU(),
+            nn.Dropout(0.5)
+        )
+
+        
+        if softm:
+            self.classifier= nn.Sequential(     
+                nn.Linear(512, output_size), 
+                nn.Softmax(dim = 1)
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Linear(512, output_size * 10), 
+                nn.ReLU(),
+                nn.AvgPool1d(10, 10)
+            )
+    def forward(self, x: torch.Tensor):
+        x = x.unsqueeze(1)      #(B, T, H, W) -> (B, C, T, H, W) con C = 1 
+        x = self.conv_fc(x)
+        out = self.classifier(x)
+        return out
+
 
 
 #I've changed the input channels of the first conv layer from 3 to 2.
@@ -270,7 +321,6 @@ class mySEWResNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
-
 
 
 def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, **kwargs):
@@ -558,3 +608,121 @@ def spikformer(pretrained=False, **kwargs):
     )
     model.default_cfg = _cfg()
     return model
+
+
+"""
+class myDVSGestureRANNv1(nn.Module):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = True):
+        super().__init__()
+        conv = []
+        nconv_blocks = 5
+        print('Number of conv_blocks:',nconv_blocks)
+        for i in range(nconv_blocks):
+            if conv.__len__() == 0:
+                in_channels = 1
+            else:
+                in_channels = channels
+
+            conv.append(nn.Conv2d(in_channels, channels, kernel_size=3, padding=1, bias=False))
+            conv.append(nn.BatchNorm2d(channels))
+            conv.append(nn.ReLU())
+            conv.append(nn.MaxPool2d(2, 2))
+
+        outp_convx = input_sizexy[0] // (2**nconv_blocks)
+        outp_convy = input_sizexy[1] // (2**nconv_blocks)
+
+        self.conv_fc = nn.Sequential(
+            *conv,
+
+            nn.Flatten(),
+            nn.Dropout(0.5),
+            #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
+            nn.Linear(channels * outp_convx * outp_convy, 512), 
+            nn.ReLU(),
+            nn.Dropout(0.5)
+        )
+
+        
+        if softm:
+            #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
+            self.gru = nn.GRU(input_size=512, hidden_size = output_size, num_layers=1, batch_first=True)
+            self.classifier= nn.Sequential(      
+                nn.Softmax(dim = 1)
+            )
+        else:
+            self.gru = nn.GRU(input_size=512, hidden_size = output_size * 10, num_layers = 2, batch_first=True)
+            self.classifier = nn.Sequential(
+                nn.ReLU(),
+                nn.AvgPool1d(10, 10)
+            )
+
+
+    def forward(self, x: torch.Tensor):
+        x = x.unsqueeze(2)      #Adding the channel dimension since data from e2vid doesnt include it
+        batch_size, num_frames, channels, height, width = x.size()
+        x = x.view(batch_size * num_frames, channels, height, width)
+        x = self.conv_fc(x)
+        x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
+
+        # Pasar los frames secuencialmente a la capa GRU. El estado inicial de la celda GRU h_0 será la que da por defecto(torch.zeros(..))
+        out, hidden = self.gru(x)
+        # Utilizar el último estado oculto como entrada para la capa totalmente conectada final
+        out = self.classifier(out[:, -1, :])
+
+        return out
+
+class myDVSGestureANNv1(nn.Module):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = True):
+        super().__init__()
+        conv = []
+        nconv_blocks = 5
+        print('Number of conv_blocks:',nconv_blocks)
+        for i in range(nconv_blocks):
+            if conv.__len__() == 0:
+                in_channels = 1
+            else:
+                in_channels = channels
+
+            conv.append(nn.Conv2d(in_channels, channels, kernel_size=3, padding=1, bias=False))
+            conv.append(nn.BatchNorm2d(channels))
+            conv.append(nn.ReLU())
+            conv.append(nn.MaxPool2d(2, 2))
+
+        outp_convx = input_sizexy[0] // (2**nconv_blocks)
+        outp_convy = input_sizexy[1] // (2**nconv_blocks)
+
+        self.conv_fc = nn.Sequential(
+            *conv,
+
+            nn.Flatten(),
+            nn.Dropout(0.5),
+            #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
+            nn.Linear(channels * outp_convx * outp_convy, 512), 
+            nn.ReLU(),
+            nn.Dropout(0.5)
+        )
+
+        
+        if softm:
+            self.classifier= nn.Sequential(     
+                nn.Linear(512, output_size), 
+                nn.Softmax(dim = 1)
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Linear(512,output_size*10), 
+                nn.ReLU(),
+                nn.AvgPool1d(10, 10)
+            )
+
+
+    def forward(self, x: torch.Tensor):
+        x = x.unsqueeze(2)      #Adding the channel dimension since data from e2vid doesnt include it
+        batch_size, num_frames, channels, height, width = x.size()
+        x = x.view(batch_size * num_frames, channels, height, width)
+        x = self.conv_fc(x)
+        x = x.view(batch_size, num_frames, -1)  # Volver a la forma secuencial
+        # Promedio entre todos los pasos temporales
+        out = self.classifier(x).mean(1)
+        return out
+"""

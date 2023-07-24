@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
-from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN
+from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN, myDVSGesture3DANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
 
@@ -61,9 +61,9 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False,softm: bool = True):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, softm: bool = True):
 
-    possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN']
+    possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
     assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
 
     if not net_name.endswith('ANN'):
@@ -92,6 +92,8 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             net = myDVSGestureRANN(output_size = n_classes,input_sizexy=size_xy, softm = softm)
         elif net_name == 'DVSG_ANN':
             net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, softm = softm)
+        elif net_name == 'DVSG_3DANN':
+            net = myDVSGesture3DANN(output_size = n_classes,input_sizexy = size_xy, num_frames = num_frames,softm = softm)
         
     return net
 
