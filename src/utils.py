@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
-from models import myDVSGestureNet, mysew_resnet18, myDVSGestureANN
+from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
 
@@ -61,9 +61,9 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, recurrence: bool = True,softm: bool = True):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False,softm: bool = True):
 
-    possible_nets = ['DVSG_net','resnet18','DVSG_ANN']
+    possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN']
     assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
 
     if not net_name.endswith('ANN'):
@@ -88,7 +88,10 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             functional.set_backend(net, 'cupy', instance = neuron_model)
             print('Using cupy in backend')
     else:
-        net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, recurrence = recurrence, softm = softm)
+        if net_name == 'DVSG_RANN':
+            net = myDVSGestureRANN(output_size = n_classes,input_sizexy=size_xy, softm = softm)
+        elif net_name == 'DVSG_ANN':
+            net = myDVSGestureANN(output_size = n_classes,input_sizexy=size_xy, softm = softm)
         
     return net
 
@@ -177,3 +180,10 @@ def test_model(net, n_classes,tst_loader,
         test_loss /= test_samples
         test_acc /= test_samples
         return test_loss,test_acc
+
+
+
+
+
+
+

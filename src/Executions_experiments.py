@@ -11,7 +11,7 @@ from Laboratory import  execute_experiment_kfold,execute_experiment_TrTstSplit
 nepochs = 85
 if __name__ == '__main__':
 
-    execute_experiment_kfold(project_ref = 'ExperimentKFolds', name_experim = 'Animals_b2_video_T22_RANN_SoftM', T = 22, batch_size = 2, epochs = nepochs,data_type='video',net_name='DVSG_ANN',
+    execute_experiment_kfold(project_ref = 'ExperimentKFolds', name_experim = 'Animals_b2_video_T22_RANN', T = 22, batch_size = 2, epochs = nepochs,data_type='video',net_name='DVSG_RANN',softm=False,
                           lr = 0.1, inp_data = data_animals)
     #execute_experiment_kfold(project_ref = 'ExperimentKFolds', name_experim = 'DVSActRec_b2_byexpdecay_T22', T = 22, splitby = 'exp_decay', 
     #                         batch_size = 2, epochs = nepochs, inp_data = data_actrec,nworkers = 8)
