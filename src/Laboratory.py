@@ -27,7 +27,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = True,
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
     set_seed()
@@ -170,7 +170,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
                         epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net', noutp_per_class = 10, nneurons_linear_layer = 512,
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
-                        data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = True
+                        data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = False
                         ):
     set_seed()
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')

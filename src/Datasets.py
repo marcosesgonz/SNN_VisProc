@@ -1600,20 +1600,18 @@ class MAD():
         #print(f'Start {start}, end {end}, segment_id {segment_id}, subject_id {subj_id}')
         for i in range(start,end+1):
             jpg_name = str(i).zfill(8) + '.jpg'
-            img = MAD.preprocess_image(os.path.join(input_dir,jpg_name))
+            img = MAD.preprocess_and_load_jpg(os.path.join(input_dir,jpg_name))
             frames.append(img)
         frames = np.array(frames)
         outp_name_file = os.path.join(output_dir,f'S{subj_id}_segment_' + str(segment_id).zfill(3))
         np.savez(outp_name_file, video = frames)
 
     @staticmethod
-    def preprocess_image(img_path):
-        img = cv2.imread(img_path)
-        if img.shape[2] != 3:
-            raise ImportError(f'File {img_path} doesnt have three channels.')
-        img_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-        img_gray_resized = cv2.resize(img_gray,(196,147))
-        return img_gray_resized
+    def preprocess_and_load_jpg(img_path):
+        img_gray = cv2.imread(img_path,0) #With 0 paramets y put the frame in gray scale
+        img_gray_cropped = img_gray[:-30,99:-91]  #(H,W) -> (480,640) -> (450,450)
+        img_gray_cropresized = cv2.resize(img_gray_cropped,(128,128)) #(450,450) -> (128,128)
+        return img_gray_cropresized
 
     @staticmethod
     def list_only_dirs(root):
@@ -1624,12 +1622,8 @@ class MAD():
         :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W` is the weight of the data.
         :rtype: tuple
         '''
-        if self.data_type in ['event','frame']:
-            return 180, 160   #Estas son las dimensiones para la cámara DVS. Para la cámara convencional las dimensiones son 147,196.
-        elif self.data_type == 'video':
-            return 147, 196
-        else:
-            raise ValueError
+
+        return 128, 128   
 
     @staticmethod
     def load_events_np(fname: str):
@@ -1640,11 +1634,16 @@ class MAD():
         But for some datasets, e.g., ES-ImageNet, it can be different.
         '''
         events = np.load(fname, allow_pickle=True).item()
-        #Rename times key: ts -> t
-        events['t'] = events['ts']
-        del events['ts']
-        #Rename polarity: [-1,1] -> [0,1]
+        #Reasign polarity: [-1,1] -> [0,1]
         events['p'][ events['p'] == -1 ] = 0
+        #Crop frames from base border a total of 20 px's and resize it: (180,160) -> (160,160) -> (128,128)
+        mask = (events['y'] < 160)
+        resize_to128  = lambda array: (array/160*128).astype(np.uint8)
+        events['x'] = resize_to128(events['x'][mask])
+        events['y'] = resize_to128(events['y'][mask])
+        events['t'] = events['ts'][mask] #Also rename times key: ts -> t
+        events['p'] = events['p'][mask]
+        del events['ts']
         return events
     
     @staticmethod
