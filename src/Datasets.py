@@ -1703,7 +1703,7 @@ class MAD():
                 msg += f"Supported extensions are: {extensions if isinstance(extensions, str) else ', '.join(extensions)}"
             raise FileNotFoundError(msg)
 
-        return np.array(instances, dtype=[('string', f'U{max_len_str}'), ('integer', int)]), np.array(subjects)
+        return np.array(instances, dtype=[('string', f'U{max_len_str}'), ('integer', np.int64)]), np.array(subjects)
     
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         path, target = self.data[index]

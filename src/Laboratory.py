@@ -26,7 +26,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',
+                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = True,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
@@ -45,7 +45,8 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
     print('SNN model: ',SNNmodel)
-    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
+                    neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
     n_params = num_trainable_params(net)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -167,7 +168,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         """
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
-                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
+                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net', noutp_per_class = 10, nneurons_linear_layer = 512,
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
                         data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = True
                         ):
@@ -227,7 +228,8 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         #Cupy backend if possible
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
-        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+        net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
+                        neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
         n_params = num_trainable_params(net)
         wandb.config.update({'n_trainable_params' : '%.6e' %n_params})
         net.to(device)

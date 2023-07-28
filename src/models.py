@@ -7,7 +7,7 @@ from copy import deepcopy
 
 #Net for Experiment 1. ES la red que propone spikingjelly para DVSNet
 class myDVSGestureNet(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),spiking_neuron: callable = None, **kwargs):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), noutp_per_class = 10, nneurons_linear_layer = 512,spiking_neuron: callable = None, **kwargs):
         super().__init__()
 
         conv = []
@@ -33,15 +33,15 @@ class myDVSGestureNet(nn.Module):
             layer.Flatten(),
             layer.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
-            layer.Linear(channels * outp_convx * outp_convy, 512), 
+            layer.Linear(channels * outp_convx * outp_convy, nneurons_linear_layer), 
             spiking_neuron(**deepcopy(kwargs)),
 
             layer.Dropout(0.5),
             #La última capa cambia su tamaño en función del número de clases posibles. De esta manera la capa de votación(VotingLayer) la dejamos fijas con 10 neuronas por voto('maxpooling' de 10)
-            layer.Linear(512, output_size * 10),   
+            layer.Linear(nneurons_linear_layer, output_size * noutp_per_class),   
             spiking_neuron(**deepcopy(kwargs)),
 
-            layer.VotingLayer(10)  
+            layer.VotingLayer(noutp_per_class)  
         )
 
     def forward(self, x: torch.Tensor):  #x.shape = (T, N, C, H, W)
@@ -52,7 +52,7 @@ class myDVSGestureNet(nn.Module):
 
 
 class myDVSGestureANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = False):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), noutp_per_class = 10, nneurons_linear_layer = 512,softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
@@ -77,7 +77,7 @@ class myDVSGestureANN(nn.Module):
             nn.Flatten(),
             nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
-            nn.Linear(channels * outp_convx * outp_convy, 512), 
+            nn.Linear(channels * outp_convx * outp_convy, nneurons_linear_layer), 
             nn.ReLU(),
             nn.Dropout(0.5)
         )
@@ -85,14 +85,14 @@ class myDVSGestureANN(nn.Module):
         
         if softm:
             self.classifier= nn.Sequential(     
-                nn.Linear(512, output_size), 
+                nn.Linear(nneurons_linear_layer, output_size), 
                 nn.Softmax(dim = 1)
             )
         else:
             self.classifier = nn.Sequential(
-                nn.Linear(512,output_size*10), 
+                nn.Linear(nneurons_linear_layer,output_size*noutp_per_class), 
                 nn.ReLU(),
-                nn.AvgPool1d(10, 10)
+                nn.AvgPool1d(noutp_per_class, noutp_per_class)
             )
 
 
@@ -108,7 +108,7 @@ class myDVSGestureANN(nn.Module):
 
 
 class myDVSGestureRANN(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128),softm = False):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), noutp_per_class = 10, nneurons_linear_layer = 512,softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
@@ -133,21 +133,21 @@ class myDVSGestureRANN(nn.Module):
             nn.Flatten(),
             nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
-            nn.Linear(channels * outp_convx * outp_convy, 512), 
+            nn.Linear(channels * outp_convx * outp_convy, nneurons_linear_layer), 
             nn.ReLU(),
             nn.Dropout(0.5)
         )
         #Recurrent layer with GRU. Inputsize indica el tamaño de entrada y hidden size el tamaño del estado oculto además del tamaño del estado de salida
-        self.gru = nn.GRU(input_size=512, hidden_size = output_size * 10, num_layers=2, batch_first=True, dropout = 0.3)
+        self.gru = nn.GRU(input_size = nneurons_linear_layer, hidden_size = output_size * noutp_per_class, num_layers=2, batch_first=True, dropout = 0.3)
         if softm:   
             self.classifier= nn.Sequential(   
-                nn.Linear(output_size * 10, output_size),  
+                nn.Linear(output_size * noutp_per_class, output_size),  
                 nn.Softmax(dim = 1)
             )
         else:
             self.classifier = nn.Sequential(
                 nn.ReLU(),
-                nn.AvgPool1d(10, 10)
+                nn.AvgPool1d(noutp_per_class, noutp_per_class)
             )
 
 
@@ -167,7 +167,7 @@ class myDVSGestureRANN(nn.Module):
 
 
 class myDVSGesture3DANN(nn.Module):
-    def __init__(self, channels = 48, output_size = 11, input_sizexy =(128,128), num_frames = 22, softm = False):
+    def __init__(self, channels = 48, output_size = 11, input_sizexy =(128,128), num_frames = 22, noutp_per_class = 10, nneurons_linear_layer = 512, softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
@@ -195,7 +195,7 @@ class myDVSGesture3DANN(nn.Module):
             nn.Flatten(),
             nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
-            nn.Linear(channels * outp_convx * outp_convy * outp_convz, 512), 
+            nn.Linear(channels * outp_convx * outp_convy * outp_convz, nneurons_linear_layer), 
             nn.ReLU(),
             nn.Dropout(0.5)
         )
@@ -203,14 +203,14 @@ class myDVSGesture3DANN(nn.Module):
         
         if softm:
             self.classifier= nn.Sequential(     
-                nn.Linear(512, output_size), 
+                nn.Linear(nneurons_linear_layer, output_size), 
                 nn.Softmax(dim = 1)
             )
         else:
             self.classifier = nn.Sequential(
-                nn.Linear(512, output_size * 10), 
+                nn.Linear(nneurons_linear_layer, output_size * noutp_per_class), 
                 nn.ReLU(),
-                nn.AvgPool1d(10, 10)
+                nn.AvgPool1d(noutp_per_class, noutp_per_class)
             )
     def forward(self, x: torch.Tensor):
         x = x.unsqueeze(1)      #(B, T, H, W) -> (B, C, T, H, W) con C = 1 
