@@ -1,0 +1,2 @@
+#IT IS NECESSARY TO MANUALLY DELETE THIS FILES
+knife_peel/s5_segment_014.npz

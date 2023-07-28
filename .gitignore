@@ -2,8 +2,12 @@ spikingjelly_alias
 *.csv
 *.aedat
 *.npz
+*.npy
 #Quitar archivos .txt dentro de subcarpetas de data
-data/**/*.txt 
+data/**/*.txt
+#Quitar imagenes .jpg correspondientes a instancias 
+data/**/*.jpg
+data/**/*.json
 /**/*.DS_Store
 *.DS_Store
 *.rar

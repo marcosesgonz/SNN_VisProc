@@ -47,13 +47,13 @@ def mycal_fixed_frames_number_segment(events_t: np.ndarray, split_by: str, frame
     elif split_by == 'time':
         j_l = np.zeros(shape=[frames_num], dtype=int)
         dt = (events_t[-1] - events_t[0]) // frames_num
-        print(f't_0: {events_t[0]}, t_fin: {events_t[-1]}')
+        #print(f't_0: {events_t[0]}, t_fin: {events_t[-1]}')
         idx = np.arange(N)
         for i in range(frames_num):
             t_l = dt * i + events_t[0]
             t_r = t_l + dt
             mask = np.logical_and(events_t >= t_l, events_t < t_r)
-            print(f' t_i:  {t_l}, t_fi: {t_r} ', np.all(mask ==False))
+            #print(f' t_i:  {t_l}, t_fi: {t_r} ', np.all(mask ==False))
             idx_masked = idx[mask]
             if len(idx_masked) == 0:    #Este if es añadido por mi. 
                 warnings.warn('Detected a time step with no events within.',UserWarning)
@@ -166,7 +166,10 @@ def myintegrate_events_by_fixed_frames_number(events: Dict, split_by: str, frame
 #A continuation of integrate_events_file_to_frames_file_by_fixed_frames_number
 def integrate_events_to_frame_wfixed_frames_num(loader: Callable, events_np_file: str, output_dir: str, split_by: str, frames_num: int, H: int, W: int,
                                                                 print_save: bool = False, factor_tau: float = 0.8, scale_factor: int = 50) -> None:
-    fname = os.path.join(output_dir, os.path.basename(events_np_file))
+    if events_np_file.endswith('.npy'):
+        fname = os.path.join(output_dir, os.path.basename(events_np_file[:-4]))
+    else:
+        fname = os.path.join(output_dir, os.path.basename(events_np_file))
     np_savez(fname, frames=myintegrate_events_by_fixed_frames_number(loader(events_np_file),split_by, frames_num, H, W, factor_tau, scale_factor))
     if print_save:
         print(f'Frames [{fname}] saved.')

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
-from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture
+from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture, MAD
 from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN, myDVSGesture3DANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
@@ -21,6 +21,32 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 torch.backends.mps.deterministic = True
 torch.backends.cuda.deterministic = True
+
+def scan_corrupted_files(frames_root,min_value,max_value):
+    """
+    Important scanning function to check outlayers in FRAMES PROCESSED WITH EXP_DECAY splitby method. This function scan folders with the same composition of datasets folders 'train' and 'test'.
+    """
+    corrupted_files = []
+    for class_ in [it.name for it in os.scandir(frames_root) if it.is_dir()]:
+        for sample in os.listdir(os.path.join(frames_root,class_)):
+            if sample.endswith('.npz'):
+                sample_root = os.path.join(frames_root,class_,sample)
+                l = np.load(sample_root, allow_pickle=True)['frames'].astype(np.float32)
+                unique_values = np.unique(l)
+                if not (np.all(unique_values >= min_value) and np.all(unique_values <= max_value)):
+                    print(f'Sample {sample_root} possibly corrupted.')
+                    corrupted_files.append(sample_root)
+                elif len(unique_values) == 1:
+                    print(f'Warning. Only {unique_values} encountered in {sample_root}.')
+                    corrupted_files.append(sample_root)
+                else:
+                    for individual_frame in l:
+                        if len(np.unique(individual_frame)) == 1:
+                            print(f'Warning. Only one value encountered in frame {individual_frame} of {sample_root}.')
+                            corrupted_files.append(sample_root)
+        
+        return (corrupted_files if len(corrupted_files) > 0 else  None)
+
 
 
 def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0):
@@ -45,6 +71,11 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
                                     split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
         test_set = DVSActionRecog(root = input_data,train = False, data_type = datatype, frames_number = time_step,
                                     split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+    elif relative_root == 'MAD_dataset':
+        train_set = MAD(root = input_data, train = True, test_subj_id = 1, data_type = datatype, frames_number = time_step,
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
+        test_set = MAD(root = input_data, train = False, test_subj_id = 1, data_type = datatype, frames_number = time_step,
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
     
@@ -55,16 +86,23 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         train_set = EventMix(dataset=train_set, num_class = len(train_set.classes),num_mix = 1,
                              beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3) 
         print('Using data augmentation with %.2f prob'%data_aug_prob)
+
     if tr_tst_split:
         return train_set,test_set,num_classes,size_xy
-    else: 
-        return ConcatDataset([train_set,test_set]), num_classes, size_xy
+    
+    else:
+        if relative_root == 'MAD_dataset':   #En verdad, es equivalente usar ConcatDataset o llamar de nuevo a la función MAD sin especificar 'test_subj_id'
+            data_set = MAD(root = input_data, data_type = datatype, frames_number = time_step,
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
+            return data_set, num_classes, size_xy
+        else:
+            return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
 def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, softm: bool = True):
 
     possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
-    assert net_name in possible_nets, 'Unknown arquitecture. Could check posible names.'
+    assert (net_name in possible_nets), 'Unknown arquitecture. Could check posible names.'
 
     if not net_name.endswith('ANN'):
         if neuron_type == 'IF':
@@ -96,6 +134,11 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             net = myDVSGesture3DANN(output_size = n_classes,input_sizexy = size_xy, num_frames = num_frames,softm = softm)
         
     return net
+
+def num_trainable_params(net):
+    trainable_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    return trainable_params
+    
 
 def reset_weights(m):
   '''
@@ -182,10 +225,5 @@ def test_model(net, n_classes,tst_loader,
         test_loss /= test_samples
         test_acc /= test_samples
         return test_loss,test_acc
-
-
-
-
-
 
 

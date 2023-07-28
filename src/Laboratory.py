@@ -2,10 +2,10 @@ import torch
 import wandb
 import random
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold,LeaveOneGroupOut
 import numpy as np
 import os
-from utils import load_net,loading_data,test_model,train_model,reset_weights
+from utils import load_net,loading_data,test_model,train_model,reset_weights, num_trainable_params
 #set the seed for reproducibility
 seed = 310
 try:
@@ -46,6 +46,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     SNNmodel = not net_name.endswith('ANN')
     print('SNN model: ',SNNmodel)
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+    n_params = num_trainable_params(net)
     #Registro en wandb para la monitorización
     wandb.login()
     if run_id is not None:
@@ -65,7 +66,8 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             device = device,
             DatAug_probability = data_aug_prob,
             neuron_type = neuron_type,
-            architecture=net_name)
+            architecture=net_name,
+            n_trainable_params = '%.6e'%n_params)
         if splitby == 'exp_decay':
             hyperparameters['tau factor'] = factor_tau
             hyperparameters['scale factor'] = scale_factor
@@ -226,12 +228,23 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
         net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+        n_params = num_trainable_params(net)
+        wandb.config.update({'n_trainable_params' : '%.6e' %n_params})
         net.to(device)
         SNNmodel = not net_name.endswith('ANN')
         print('SNN model: ',SNNmodel)
-        #Cross validation of 5 folds
-        skf5 = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
-        for nkfold,(train_idx,test_idx) in enumerate(skf5.split(data_set, y = [sample[1] for sample in data_set])):
+
+        if relative_root == 'MAD_dataset':
+            print('Using leave_one_out strategy')
+            #LeaveOneOut strategy for MAD dataset. One fold per subject(5 subjects)
+            logo = LeaveOneGroupOut()
+            folds_iterator = logo.split(X = data_set, groups = data_set.subjects)
+        else:
+            #Cross validation of 5 folds
+            folds_creator = StratifiedKFold(n_splits = kfolds,shuffle=True,random_state=seed)
+            folds_iterator = folds_creator.split(data_set, y = [sample[1] for sample in data_set])
+
+        for nkfold,(train_idx,test_idx) in enumerate(folds_iterator):
             print('----------Fold {}-------------'.format(nkfold))
             #Reseteo los pesos de la red
             print('Reseting wegihts..')

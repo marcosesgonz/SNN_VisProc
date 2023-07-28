@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 import numpy as np
 from torchvision.datasets import utils
 from abc import abstractmethod
@@ -17,7 +17,10 @@ import struct
 import tonic
 import random
 import subprocess
-
+import shutil
+import json
+import cv2
+from typing import cast
 
 def load_npz_video(file_name):
     return np.load(file_name,allow_pickle=True)['video'].astype(np.float32)
@@ -327,7 +330,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
         else:
             _root = self.set_root_when_train_is_none(_root)
 
-        super().__init__(root=_root, loader=_loader, extensions=('.npz', ), transform=_transform,
+        super().__init__(root=_root, loader=_loader, extensions=('.npz', ), transform=_transform, #Habría que añadir en extensions .npy si se quiere trabajar directamente con eventos
                          target_transform=_target_transform)
 
     def set_root_when_train_is_none(self, _root: str):
@@ -1343,3 +1346,369 @@ class DVSActionRecog(MyNeuromorphicDatasetFolder):
         :rtype: tuple
         '''
         return 260//2, 346//2
+    
+
+
+
+
+mad_classes = {
+  0: "cup_drink",
+  1: "cup_pound",
+  2: "cup_shake",
+  3: "cup_move",
+  4: "cup_pour",
+  5: "stone_pound",
+  6: "stone_move",
+  7: "stone_play",
+  8: "stone_grind",
+  9: "stone_carve",
+  10: "sponge_squeeze",
+  11: "sponge_flip",
+  12: "sponge_wash",
+  13: "sponge_wipe",
+  14: "sponge_scratch",
+  15: "spoon_scoop",
+  16: "spoon_stir",
+  17: "spoon_hit",
+  18: "spoon_eat",
+  19: "spoon_sprinkle",
+  20: "knife_cut",
+  21: "knife_chop",
+  22: "knife_poke a hole",
+  23: "knife_peel",
+  24: "knife_spread",
+}
+
+objects_mad = ['cup', 'stone', 'sponge', 'spoon', 'knife']   
+
+class MAD():
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            test_subj_id: int = None,
+            data_type: str = 'event',
+            frames_number: int = None,
+            split_by: str = None,
+            duration: int = None,
+            custom_integrate_function: Callable = None,
+            custom_integrated_frames_dir_name: str = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+            factor_tau: float = 0.8,
+            scale_factor: int = 50
+    ) -> None:
+        """
+        If test_sub_id is not specified, full dataset will be loaded. If else, it depends in train bool value (train/test split)
+        """
+        self.n_steps = frames_number
+        events_np_root = os.path.join(root, 'events_np')
+        self.data_type = data_type
+
+        if not os.path.exists(events_np_root):
+            raise ('Please download events files from https://drive.ugr.es/index.php/s/rLq5wVayaoj8yff/download and unzip it in events_np folder')
+        else:
+            assert 'spatula' not in os.listdir(events_np_root), 'Please remove spatula folder'
+            items = ['cup','knife','sponge','spoon','stone']
+            items_file_list = MAD.list_only_dirs(events_np_root)
+            if items == items_file_list:
+                print('Rearranging files from events_np')
+                for item in items_file_list:
+                    for action in MAD.list_only_dirs(os.path.join(events_np_root,item)):
+                        new_dir = os.path.join(events_np_root,item + '_' + action)
+                        os.mkdir(new_dir)
+                        for sample in sorted(os.listdir(os.path.join(events_np_root,item,action))):
+                            origin = os.path.join(events_np_root,item,action,sample)
+                            destination = os.path.join(new_dir,sample)
+                            shutil.move(origin,destination)
+                    shutil.rmtree(os.path.join(events_np_root,item))
+
+            
+        H, W = self.get_H_W()
+
+        if data_type == 'event':
+            _root = events_np_root
+            _loader = np.load
+
+        elif data_type == 'frame':
+            if frames_number is not None:
+                assert frames_number > 0 and isinstance(frames_number, int)
+                assert split_by in ('time', 'number' ,'exp_decay')
+                if split_by == 'exp_decay':
+                    fact_tau = str(factor_tau).replace('.','_')
+                    frames_np_root = os.path.join(root, f'frames_num{frames_number}_splitby_{split_by}_tau{fact_tau}_scale{scale_factor}')
+                else:
+                    frames_np_root = os.path.join(root, f'frames_number_{frames_number}_split_by_{split_by}')
+                if os.path.exists(frames_np_root):
+                    print(f'The directory [{frames_np_root}] already exists.')
+                else:
+                    os.mkdir(frames_np_root)
+                    print(f'Mkdir [{frames_np_root}].')
+
+                    # create the same directory structure
+                    sjds.create_same_directory_structure(events_np_root, frames_np_root)
+
+                    # use multi-thread to accelerate
+                    t_ckp = time.time()
+                    with ThreadPoolExecutor(max_workers=configure.max_threads_number_for_datasets_preprocess) as tpe:
+                        print(f'Start ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                        for e_root, e_dirs, e_files in os.walk(events_np_root):
+                            if e_files.__len__() > 0:
+                                output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
+                                for e_file in e_files:
+                                    if e_file.endswith('.npy'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(event_integration_to_frame.integrate_events_to_frame_wfixed_frames_num,
+                                                    self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W,print_save= True,
+                                                    factor_tau = factor_tau, scale_factor = scale_factor)
+                    print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+
+                _root = frames_np_root
+                _loader = sjds.load_npz_frames
+
+            elif duration is not None:
+                assert split_by in ['time','number']
+                assert duration > 0 and isinstance(duration, int)
+                frames_np_root = os.path.join(root, f'duration_{duration}')
+                if os.path.exists(frames_np_root):
+                    print(f'The directory [{frames_np_root}] already exists.')
+
+                else:
+                    os.mkdir(frames_np_root)
+                    print(f'Mkdir [{frames_np_root}].')
+                    # create the same directory structure
+                    sjds.create_same_directory_structure(events_np_root, frames_np_root)
+                    # use multi-thread to accelerate
+                    t_ckp = time.time()
+                    with ThreadPoolExecutor(max_workers=configure.max_threads_number_for_datasets_preprocess) as tpe:
+                        print(f'Start ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                        for e_root, e_dirs, e_files in os.walk(events_np_root):
+                            if e_files.__len__() > 0:
+                                output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
+                                for e_file in e_files:
+                                    if e_file.endswith('.npz'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(sjds.integrate_events_file_to_frames_file_by_fixed_duration, self.load_events_np, events_np_file, output_dir, duration, H, W, True)
+
+                    print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+
+                _root = frames_np_root
+                _loader = sjds.load_npz_frames
+                if custom_integrated_frames_dir_name is None:
+                    custom_integrated_frames_dir_name = custom_integrate_function.__name__
+
+                frames_np_root = os.path.join(root, custom_integrated_frames_dir_name)
+                if os.path.exists(frames_np_root):
+                    print(f'The directory [{frames_np_root}] already exists.')
+                else:
+                    os.mkdir(frames_np_root)
+                    print(f'Mkdir [{frames_np_root}].')
+                    # create the same directory structure
+                    sjds.create_same_directory_structure(events_np_root, frames_np_root)
+                    # use multi-thread to accelerate
+                    t_ckp = time.time()
+                    with ThreadPoolExecutor(max_workers=configure.max_threads_number_for_datasets_preprocess) as tpe:
+                        print(f'Start ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                        for e_root, e_dirs, e_files in os.walk(events_np_root):
+                            if e_files.__len__() > 0:
+                                output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
+                                for e_file in e_files:
+                                    if e_file.endswith('.npz'):  
+                                        events_np_file = os.path.join(e_root, e_file)
+                                        print( f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                        tpe.submit(sjds.save_frames_to_npz_and_print, os.path.join(output_dir, os.path.basename(events_np_file)), custom_integrate_function(np.load(events_np_file), H, W))
+
+                    print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
+
+                _root = frames_np_root
+                _loader = sjds.load_npz_frames
+
+            else:
+                raise ValueError('At least one of "frames_number","duration" should not be None.')
+            
+        elif data_type == 'video':
+            raw_vid_root = os.path.join(root, 'raw_video')
+            items_jsons_root = os.path.join(root,'mad-meta-data')
+            assert os.path.isdir(raw_vid_root) and os.path.isdir(items_jsons_root)
+            vid_root = os.path.join(root,'video')
+            if os.path.exists(vid_root):
+                print('Video folder already exists.')
+            else:
+                os.mkdir(vid_root)
+                sjds.create_same_directory_structure(events_np_root, vid_root)
+
+                jsons_items_files = [it.name for it in os.scandir(items_jsons_root) if it.name.endswith('_db.json')]
+                assert len(jsons_items_files) == 5
+                dataset_info = dict()
+                for json_item in jsons_items_files:
+                    with open(os.path.join(items_jsons_root,json_item)) as f:
+                        dataset_info[json_item] = json.load(f) 
+                pll = 0
+                for subject in MAD.list_only_dirs(raw_vid_root):
+                    for item in MAD.list_only_dirs(os.path.join(raw_vid_root,subject)):
+                        subj,itm,rgb = item.split('_')      #Folders looks like adam_cup_rgb
+                        data_item = dataset_info[itm + '_db.json']
+                        frames_dir = os.path.join(raw_vid_root,subject,item) 
+
+                        for d in data_item:
+                            if d['subject'] == subj and d['object'] == itm:
+                                label = d['attention_type'] - 1 + objects_mad.index(d['object'])*5
+                                assert itm in mad_classes[label]
+
+                                action_class_folder = os.path.join(vid_root, mad_classes[label])
+                                if not os.path.exists(action_class_folder):
+                                    raise ValueError('La estructura de ficheros fue copia de events_np. No debe de haber error aquí')
+                                    #print(f'Creating {action_class_folder}')
+                                    #os.mkdir(action_class_folder)
+
+                                startf,endf = d['start_frame'],d['end_frame']
+                                 
+                                MAD.jpg_files_to_npz( start = startf, end = endf, input_dir = frames_dir, output_dir = action_class_folder,segment_id = d['segment_id'], subj_id = d['sub_id'])                         
+
+            _root = vid_root
+            _loader = self.load_npz_video_with_T_frames
+
+        self.loader = _loader
+        self.classes, self.class_to_idx = self.find_classes()
+        self.data,self.subjects = self.make_dataset(directory = _root,class_to_idx = self.class_to_idx, extensions = ('.npz','.npy'))
+
+        if test_subj_id is not None:
+            assert test_subj_id in [1,2,3,4,5]
+            if train:
+                self.data = self.data[self.subjects != test_subj_id]
+                self.subjects[self.subjects != test_subj_id]
+            else:
+                self.data = self.data[self.subjects == test_subj_id]
+                self.subjects[self.subjects == test_subj_id]
+
+    def set_root_when_train_is_none(self, _root: str):
+        return _root
+    
+    def load_npz_video_with_T_frames(self,file_name):
+        all_frames_img = np.load(file_name, allow_pickle = True)['video']
+        n_frames = len(all_frames_img)
+        rate = n_frames/self.n_steps
+        idxs = (np.arange(1,self.n_steps + 1) * rate - 1).astype(np.uint8)
+        final_image = all_frames_img[idxs].astype(np.float32)
+        return final_image
+
+    @staticmethod
+    def jpg_files_to_npz(start: int, end: int, input_dir: str, output_dir: str,segment_id: int, subj_id: int):
+        frames = []
+        #print(f'Start {start}, end {end}, segment_id {segment_id}, subject_id {subj_id}')
+        for i in range(start,end+1):
+            jpg_name = str(i).zfill(8) + '.jpg'
+            img = MAD.preprocess_image(os.path.join(input_dir,jpg_name))
+            frames.append(img)
+        frames = np.array(frames)
+        outp_name_file = os.path.join(output_dir,f'S{subj_id}_segment_' + str(segment_id).zfill(3))
+        np.savez(outp_name_file, video = frames)
+
+    @staticmethod
+    def preprocess_image(img_path):
+        img = cv2.imread(img_path)
+        if img.shape[2] != 3:
+            raise ImportError(f'File {img_path} doesnt have three channels.')
+        img_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        img_gray_resized = cv2.resize(img_gray,(196,147))
+        return img_gray_resized
+
+    @staticmethod
+    def list_only_dirs(root):
+        return sorted([it.name for it in os.scandir(root) if it.is_dir()] )
+    
+    def get_H_W(self) -> Tuple:
+        '''
+        :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W` is the weight of the data.
+        :rtype: tuple
+        '''
+        if self.data_type in ['event','frame']:
+            return 180, 160   #Estas son las dimensiones para la cámara DVS. Para la cámara convencional las dimensiones son 147,196.
+        elif self.data_type == 'video':
+            return 147, 196
+        else:
+            raise ValueError
+
+    @staticmethod
+    def load_events_np(fname: str):
+        '''
+        :param fname: file name
+        :return: a dict whose keys are ``['t', 'x', 'y', 'p']`` and values are ``numpy.ndarray``
+        This function defines how to load a sample from `events_np`. In most cases, this function is `np.load`.
+        But for some datasets, e.g., ES-ImageNet, it can be different.
+        '''
+        events = np.load(fname, allow_pickle=True).item()
+        #Rename times key: ts -> t
+        events['t'] = events['ts']
+        del events['ts']
+        #Rename polarity: [-1,1] -> [0,1]
+        events['p'][ events['p'] == -1 ] = 0
+        return events
+    
+    @staticmethod
+    def find_classes():
+        classes = list(mad_classes.values())
+        class_to_idx = {cls_name: i  for i,cls_name in mad_classes.items()}
+
+        return classes, class_to_idx
+    
+    def make_dataset(self,directory: str, class_to_idx: dict, extensions):
+
+        directory = os.path.expanduser(directory)
+        if class_to_idx is None:
+            _, class_to_idx = self.find_classes(directory)
+        elif not class_to_idx:
+            raise ValueError("'class_to_index' must have at least one entry to collect any samples.")
+
+        #extensions = ('.npz','.npy')
+        def is_valid_file(x: str) -> bool:
+                return x.lower().endswith(extensions if isinstance(extensions, str) else tuple(extensions)) 
+        
+        is_valid_file = cast(Callable[[str], bool], is_valid_file)
+
+        instances = []
+        subjects = []
+        max_len_str = 0
+        available_classes = set()
+        for target_class in sorted(class_to_idx.keys()):
+            class_index = class_to_idx[target_class]
+            target_dir = os.path.join(directory, target_class)
+            if not os.path.isdir(target_dir):
+                print(target_dir)
+                raise ValueError('Debe de haber algun error entre los nombres de las clases y el de las carpetas')
+            for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
+                for fname in sorted(fnames):
+                    path = os.path.join(root, fname)
+
+                    if len(path) > max_len_str:
+                        max_len_str = len(path)
+
+                    if is_valid_file(path):
+                        subject_id = int(fname[1])          #fname[1] contiene el subject id... S1_segment_001.npy por ejemplo
+                        assert subject_id in [1,2,3,4,5]
+                        item = path, class_index
+                        subject = subject_id 
+                        subjects.append(subject)
+                        instances.append(item)
+
+                        if target_class not in available_classes:
+                            available_classes.add(target_class)
+
+        empty_classes = set(class_to_idx.keys()) - available_classes
+        if empty_classes:
+            msg = f"Found no valid file for the classes {', '.join(sorted(empty_classes))}. "
+            if extensions is not None:
+                msg += f"Supported extensions are: {extensions if isinstance(extensions, str) else ', '.join(extensions)}"
+            raise FileNotFoundError(msg)
+
+        return np.array(instances, dtype=[('string', f'U{max_len_str}'), ('integer', int)]), np.array(subjects)
+    
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        path, target = self.data[index]
+        x = self.loader(path)
+        return x, target
+
+    def __len__(self) -> int:
+        return len(self.data)
