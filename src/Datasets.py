@@ -22,8 +22,7 @@ import json
 import cv2
 from typing import cast
 
-def load_npz_video(file_name):
-    return np.load(file_name,allow_pickle=True)['video'].astype(np.float32)
+
 
 
 #Class of spikingjelly edited by me in only 3 lines to avoid problems.
@@ -318,7 +317,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                     print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
 
             _root = vid_np_root
-            _loader = load_npz_video
+            _loader = self.load_npz_video
             _transform = transform
             _target_transform = target_transform
             
@@ -336,6 +335,9 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
     def set_root_when_train_is_none(self, _root: str):
         return _root
 
+    @staticmethod
+    def load_npz_video(file_name):
+        return np.load(file_name,allow_pickle=True)['video'].astype(np.float32)
 
     @staticmethod
     @abstractmethod
@@ -1571,6 +1573,7 @@ class MAD():
             _loader = self.load_npz_video_with_T_frames
 
         self.loader = _loader
+        self.transform = transform
         self.classes, self.class_to_idx = self.find_classes()
         self.data,self.subjects = self.make_dataset(directory = _root,class_to_idx = self.class_to_idx, extensions = ('.npz','.npy'))
 
@@ -1707,6 +1710,8 @@ class MAD():
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         path, target = self.data[index]
         x = self.loader(path)
+        if self.transform is not None:
+            x = self.transform(x)
         return x, target
 
     def __len__(self) -> int:

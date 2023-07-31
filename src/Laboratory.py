@@ -5,7 +5,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import StratifiedKFold,LeaveOneGroupOut
 import numpy as np
 import os
-from utils import load_net,loading_data,test_model,train_model,reset_weights, num_trainable_params
+from utils import load_net,loading_data,test_model,train_model,reset_weights, num_trainable_params, convert_to_3d_eframes
 #set the seed for reproducibility
 seed = 310
 try:
@@ -26,27 +26,27 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
-                        epochs = 30,gpu = True,lr = 0.1, inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False,
+                        epochs = 30,gpu = True,lr = 0.1, ler_rate_type = 'CosAnn',inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False, resnet_pretrained = False, fine_tuning = False,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
     set_seed()
-    device = ("cuda" if torch.cuda.is_available() else 'mps' if gpu else 'cpu')
-    print('Using %s as device'% device)
-
+    device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
+    
+    transform_ = convert_to_3d_eframes if net_name == 'resnet18' and data_type == 'frame' else None
+    
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
                                                          splitmeth = splitby, tr_tst_split = split_tr_tst,
                                                          tau_factor = factor_tau, scale_factor = scale_factor,
-                                                         data_aug_prob = data_aug_prob)
+                                                         data_aug_prob = data_aug_prob, transform = transform_)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
-    print('SNN model: ',SNNmodel)
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
-                    neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+                    neuron_type = neuron_type, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning, cupy = cupy, softm = softm, num_frames = T)
     n_params = num_trainable_params(net)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -72,6 +72,9 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
         if splitby == 'exp_decay':
             hyperparameters['tau factor'] = factor_tau
             hyperparameters['scale factor'] = scale_factor
+        if net_name == 'DVSG_net':
+            hyperparameters['nneurons_linear_layer'] = nneurons_linear_layer
+            hyperparameters['noutp_per_class'] = noutp_per_class
         resume_ = None
 
     with wandb.init(project = project_ref, name = name_experim,
@@ -97,12 +100,27 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             num_workers = 2,
             pin_memory=True
         )
+        print('Using %s as device'% device)
+        print('Applying 2d to 3d conversion to frames.')
+        print('SNN model: ',SNNmodel)
+        print('Number of trainable paramenters:  %.6e'%n_params)
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias train/test:', train_size_,'/', test_size_)
-        #Optimizamos con SGD
-        optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
-        #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
 
+        #Optimizamos con SGD
+        if resnet_pretrained and fine_tuning:
+            print('Doing fine tuning...') 
+            #We only give to the optimizer the fc output layer to do fine tuning(the rest of parameters are frozen)
+            optimizer = torch.optim.SGD(net.fc.parameters(), lr = lr, momentum = 0.9)
+        else:
+            optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9) 
+
+        #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
+        if ler_rate_type == 'CosAnn':
+            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+        elif ler_rate_type == 'Const':
+            lr_scheduler = None
+        else: 
+            raise NotImplemented("The possible learning rate types are 'Cosine Annealing' and 'Constant'")
         max_test_acc = -1
         start_epoch = 0
         #Cargamos los datos si se quiere continuar ejecución
@@ -126,7 +144,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 
         for epoch in range(start_epoch, epochs):
             train_loss, train_acc = train_model(net=net, n_classes = nclasses_,tr_loader = train_data_loader,
-                                                optimizer = optimizer,device = device, lr_scheduler = lr_scheduler,SNNmodel = SNNmodel,
+                                                optimizer = optimizer,device = device, lr_scheduler = lr_scheduler, SNNmodel = SNNmodel,
                                                 data_augmented= data_aug_prob!=0)
             writer.add_scalar('train_loss', train_loss, epoch)
             writer.add_scalar('train_acc', train_acc, epoch)
@@ -168,7 +186,8 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         """
 def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type='frame',
-                        epochs = 65, gpu = True,lr = 0.1, inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net', noutp_per_class = 10, nneurons_linear_layer = 512,
+                        epochs = 65, gpu = True,lr = 0.1, ler_rate_type = 'CosAnn', inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
+                         noutp_per_class = 10, nneurons_linear_layer = 512, resnet_pretrained = False, fine_tuning = False,
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
                         data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = False
                         ):
@@ -179,10 +198,11 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         torch.cuda.empty_cache()
     print('Using %s as device'% device)
 
+    transform_ = convert_to_3d_eframes if net_name == 'resnet18' and data_type == 'frame' else None
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type, splitmeth = splitby,tr_tst_split = False,
-                                                         tau_factor = factor_tau,scale_factor= scale_factor, data_aug_prob = data_aug_prob)
+                                                         tau_factor = factor_tau,scale_factor= scale_factor, data_aug_prob = data_aug_prob, transform = transform_)
     data_size = len(data_set)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -207,6 +227,9 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         if splitby == 'exp_decay':
             hyperparameters['tau factor'] = factor_tau
             hyperparameters['scale factor'] = scale_factor
+        if net_name == 'DVSG_net':
+            hyperparameters['nneurons_linear_layer'] = nneurons_linear_layer
+            hyperparameters['noutp_per_class'] = noutp_per_class
         resume_ = None
 
     with wandb.init(project = project_ref, name = name_experim,
@@ -229,7 +252,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         cupy = True if device == 'cuda' else False
         #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
         net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
-                        neuron_type = neuron_type, cupy = cupy, softm = softm, num_frames = T)
+                        neuron_type = neuron_type, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning, cupy = cupy, softm = softm, num_frames = T)
         n_params = num_trainable_params(net)
         wandb.config.update({'n_trainable_params' : '%.6e' %n_params})
         net.to(device)
@@ -253,10 +276,22 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
             net.apply(reset_weights)
             #Reseteo el accuracy máximo en test
             max_val_acc = 0
+
             #Optimizamos con SGD
-            optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9)     
+            if resnet_pretrained and fine_tuning:
+                print('Doing fine tuning...') 
+                #We only give to the optimizer the fc output layer to do fine tuning(the rest of parameters are frozen)
+                optimizer = torch.optim.SGD(net.fc.parameters(), lr = lr, momentum = 0.9)
+            else:
+                optimizer = torch.optim.SGD(net.parameters(), lr = lr, momentum = 0.9) 
+
             #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
-            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+            if ler_rate_type == 'CosAnn':
+                lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+            elif ler_rate_type == 'Const':
+                lr_scheduler = None
+            else: 
+                raise NotImplemented("The possible learning rate types are 'Cosine Annealing' and 'Constant'")
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
             test_subsampler = torch.utils.data.SubsetRandomSampler(test_idx)
@@ -276,7 +311,6 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                                                     data_augmented = data_aug_prob!=0)
                 val_loss,val_acc = test_model(net = net, n_classes = nclasses_,tst_loader = test_data_loader,
                                                     device = device, SNNmodel = SNNmodel)
-                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_val_acc: .4f}') 
 
                 wandb.log({f'train_loss_k{nkfold}': train_loss, f'train_acc_k{nkfold}': train_acc, f'test_loss_k{nkfold}':val_loss, f'test_acc_k{nkfold}':val_acc}, step = epoch)
 
@@ -290,6 +324,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                     wandb.run.summary[f'max_val_acc_k{nkfold}'] = max_val_acc
                     save_max = True
 
+                print(f' epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={val_loss: .4f}, test_acc ={val_acc: .4f}, max_test_acc ={max_val_acc: .4f}') 
                 checkpoint = {'net': net.state_dict(),'optimizer': optimizer.state_dict(),'lr_scheduler': lr_scheduler.state_dict(),'epoch': epoch}
 
                 if save_max:

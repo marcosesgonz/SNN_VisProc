@@ -47,35 +47,46 @@ def scan_corrupted_files(frames_root,min_value,max_value):
         
         return (corrupted_files if len(corrupted_files) > 0 else  None)
 
+def convert_to_3d_eframes(frames) -> np.ndarray:
+    '''
+    Convert 2d events frames to 3d frames.
+    :param frames: events frame with the shape (T,C,H,W)
+    :type file_name: np.ndarray
+    :return: frames
+    :rtype: np.ndarray
+    '''
+    assert frames.shape[1] == 2 #By default events frames have 2 channels (T,C,H,W)
+    mean_channel_frames = np.expand_dims(np.mean(frames,axis = 1), 1)
+    frames = np.concatenate((frames,mean_channel_frames), axis = 1)
+    return frames
 
-
-def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0):
+def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0, transform = None):
     relative_root = os.path.basename(input_data)
     if relative_root == 'DVS_Gesture_dataset':
         train_set = DVS128Gesture(root = input_data, train = True, data_type = datatype, frames_number = time_step, 
-                                  split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
+                                  split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
         test_set = DVS128Gesture(root = input_data, train = False, data_type = datatype, frames_number = time_step, 
-                                 split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
+                                 split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
     elif relative_root == 'DVS_Animals_Dataset':
         train_set = DVSAnimals(root = input_data, train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
         test_set = DVSAnimals(root = input_data, train = False, data_type = datatype, frames_number = time_step, 
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
     elif relative_root == 'DVS_DailyAction_dataset':
         train_set = DVSDailyActions(root = input_data,train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
         test_set = DVSDailyActions(root = input_data,train = False, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
     elif relative_root == 'DVS_ActionRecog_dataset':
         train_set = DVSActionRecog(root = input_data,train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform)  
         test_set = DVSActionRecog(root = input_data,train = False, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor) 
+                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
     elif relative_root == 'MAD_dataset':
         train_set = MAD(root = input_data, train = True, test_subj_id = 1, data_type = datatype, frames_number = time_step,
-                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
         test_set = MAD(root = input_data, train = False, test_subj_id = 1, data_type = datatype, frames_number = time_step,
-                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
     
@@ -83,7 +94,7 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
     size_xy = train_set.get_H_W()
     if data_aug_prob != 0:
         #OJO, EventMix da ya las etiquetas con one_hot encoding al tener que mixear etiquetas para aumentar datos.
-        train_set = EventMix(dataset=train_set, num_class = len(train_set.classes),num_mix = 1,
+        train_set = EventMix(dataset=train_set, num_class = num_classes, num_mix = 1,
                              beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3) 
         print('Using data augmentation with %.2f prob'%data_aug_prob)
 
@@ -99,7 +110,8 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
             return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16,
+              noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, resnet_pretrained = False, fine_tuning = False):
 
     possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
     assert (net_name in possible_nets), 'Unknown arquitecture. Could check posible names.'
@@ -119,7 +131,8 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
                                    spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
         elif net_name == 'resnet18':
-            net = mysew_resnet18(spiking_neuron = neuron_model,num_classes = n_classes, surrogate_function=surrogate.ATan(), detach_reset=True,cnf='ADD',zero_init_residual=True)
+            net = mysew_resnet18(pretrained = resnet_pretrained, fine_tuning = fine_tuning, spiking_neuron = neuron_model, num_classes = n_classes, 
+                                 surrogate_function = surrogate.ATan(), detach_reset = True, cnf = 'ADD', zero_init_residual = True)
 
         #Establecemos las neuronas en modo multipaso
         functional.set_step_mode(net, 'm')
@@ -151,7 +164,7 @@ def reset_weights(m):
     print(f'Reset trainable parameters of layer = {layer}')
     layer.reset_parameters()
 
-def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler, SNNmodel = True, data_augmented = False):
+def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler = None, SNNmodel = True, data_augmented = False):
         net.train()
         train_loss, train_acc, train_samples = 0, 0, 0
         for frame, label in tr_loader: 
@@ -198,7 +211,8 @@ def train_model(net, n_classes, tr_loader, optimizer, device, lr_scheduler, SNNm
 
         train_loss /= train_samples
         train_acc /= train_samples
-        lr_scheduler.step()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
         
         return train_loss,train_acc
 

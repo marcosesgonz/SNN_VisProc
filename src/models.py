@@ -85,7 +85,9 @@ class myDVSGestureANN(nn.Module):
         
         if softm:
             self.classifier= nn.Sequential(     
-                nn.Linear(nneurons_linear_layer, output_size), 
+                nn.Linear(nneurons_linear_layer, output_size * noutp_per_class),
+                nn.Dropout(0.3),
+                nn.Linear(output_size * noutp_per_class, output_size),  
                 nn.Softmax(dim = 1)
             )
         else:
@@ -179,7 +181,7 @@ class myDVSGesture3DANN(nn.Module):
                 in_channels = channels
 
             conv.append(nn.Conv3d(in_channels, channels, kernel_size=3, padding=1, bias=False))
-            conv.append(nn.Dropout3d(0.3))
+            conv.append(nn.Dropout3d(0.5))
             conv.append(nn.BatchNorm3d(channels))
             conv.append(nn.ReLU())
             conv.append(nn.MaxPool3d((1, 2, 2),stride=(1,2,2)))
@@ -193,7 +195,7 @@ class myDVSGesture3DANN(nn.Module):
             *conv,
 
             nn.Flatten(),
-            nn.Dropout(0.5),
+            #nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
             nn.Linear(channels * outp_convx * outp_convy * outp_convz, nneurons_linear_layer), 
             nn.ReLU(),
@@ -241,7 +243,7 @@ class mySEWResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = layer.Conv2d(2, self.inplanes, kernel_size=7, stride=2, padding=3,   #Here I change from 3 to 2 channels in the input channels.
+        self.conv1 = layer.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,   #Here I change from 3 to 2 channels in the input channels.
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.sn1 = spiking_neuron(**deepcopy(kwargs))
@@ -316,26 +318,47 @@ class mySEWResNet(nn.Module):
             x = torch.flatten(x, 2)
         
         x = self.fc(x)
-
         return x
 
     def forward(self, x):
-        return self._forward_impl(x)
+        x = self._forward_impl(x)
+        x = x.mean(0)
+        return x
 
 
-def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, **kwargs):
-    model = mySEWResNet(block, layers, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, num_classes, fine_tuning = True, **kwargs):
+    
     if pretrained:
+        model = mySEWResNet(block, layers, cnf=cnf,num_classes = 1000, spiking_neuron=spiking_neuron, **kwargs)
         state_dict = sewr.load_state_dict_from_url(sewr.model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict)
+        in_features = model.fc.in_features  # Obtiene el número de características de entrada de la capa fc existente
+        #Fine_tuning(only works with a pretrained model)
+        if fine_tuning:
+            print('Doing fine_tuning')
+            for param in model.parameters():
+                param.requires_grad = False
+            model.fc = nn.Sequential(       #Same structure as indian researchers for resnet50: https://medium.com/@abhi1thakur/fine-tuning-for-image-classification-using-pytorch-81e77d125646
+                layer.Dropout(0.5),
+                layer.Linear(in_features,in_features),   #in_features es igual a 512 en este caso
+                layer.Dropout(0.5),
+                layer.Linear(in_features, num_classes)
+                )
+        else: 
+            model.fc = layer.Linear(in_features, num_classes)
+
+    else:
+        model = mySEWResNet(block, layers, cnf = cnf, num_classes = num_classes, spiking_neuron = spiking_neuron, **kwargs)
     return model
 
 
-def mysew_resnet18(pretrained=False, progress=True, cnf: str = None, spiking_neuron: callable=None, **kwargs):
+def mysew_resnet18(pretrained=False,fine_tuning = False, progress=True, cnf: str = None, num_classes:int = 1000, spiking_neuron: callable=None, **kwargs):
     """
     :param pretrained: If True, the SNN will load parameters from the ANN pre-trained on ImageNet
     :type pretrained: bool
+    :param fine_tuning: This parameter only works if pretrained True. If True, only the output linear classification layer will be trained.
+    :type fine_tuning: bool
     :param progress: If True, displays a progress bar of the download to stderr
     :type progress: bool
     :param cnf: the name of spike-element-wise function
@@ -350,7 +373,7 @@ def mysew_resnet18(pretrained=False, progress=True, cnf: str = None, spiking_neu
     The spike-element-wise ResNet-18 `"Deep Residual Learning in Spiking Neural Networks" <https://arxiv.org/abs/2102.04159>`_ modified by the ResNet-18 model from `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     """
 
-    return _mysew_resnet('resnet18', sewr.BasicBlock, [2, 2, 2, 2], pretrained, progress, cnf, spiking_neuron, **kwargs)
+    return _mysew_resnet('resnet18', sewr.BasicBlock, [2, 2, 2, 2], pretrained, progress, cnf, spiking_neuron, num_classes= num_classes, fine_tuning = fine_tuning, **kwargs)
 
 
 from spikingjelly.clock_driven.neuron import MultiStepLIFNode
