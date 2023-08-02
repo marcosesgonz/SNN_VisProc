@@ -110,8 +110,8 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
             return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16,
-              noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, resnet_pretrained = False, fine_tuning = False):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, drop_out2d = None,
+              noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, channels = 128, resnet_pretrained = False, fine_tuning = False):
 
     possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
     assert (net_name in possible_nets), 'Unknown arquitecture. Could check posible names.'
@@ -128,8 +128,8 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
         print(f'Using {neuron_type} neurons')
 
         if net_name == 'DVSG_net':
-            net = myDVSGestureNet(channels=128, output_size = n_classes,input_sizexy= size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
-                                   spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
+            net = myDVSGestureNet(channels = channels, output_size = n_classes,input_sizexy= size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
+                                   drop_out2d = drop_out2d,spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
         elif net_name == 'resnet18':
             net = mysew_resnet18(pretrained = resnet_pretrained, fine_tuning = fine_tuning, spiking_neuron = neuron_model, num_classes = n_classes, 
                                  surrogate_function = surrogate.ATan(), detach_reset = True, cnf = 'ADD', zero_init_residual = True)

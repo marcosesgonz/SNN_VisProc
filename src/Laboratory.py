@@ -27,7 +27,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 #Data:80% train and 20% test
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, ler_rate_type = 'CosAnn',inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
-                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False, resnet_pretrained = False, fine_tuning = False,
+                        net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False, channels = 128, drop_out2d = None, resnet_pretrained = False, fine_tuning = False,
                         factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
                         ):
     set_seed()
@@ -46,7 +46,8 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
-                    neuron_type = neuron_type, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning, cupy = cupy, softm = softm, num_frames = T)
+                    neuron_type = neuron_type, channels = channels, drop_out2d = drop_out2d, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning,
+                    cupy = cupy, softm = softm, num_frames = T)
     n_params = num_trainable_params(net)
     #Registro en wandb para la monitorización
     wandb.login()
@@ -82,6 +83,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
         if device == 'cuda':
             #Limpió la cache de la GPU
             torch.cuda.empty_cache()
+        print(net)
         net.to(device)
         
         train_data_loader = torch.utils.data.DataLoader(

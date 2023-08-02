@@ -7,7 +7,7 @@ from copy import deepcopy
 
 #Net for Experiment 1. ES la red que propone spikingjelly para DVSNet
 class myDVSGestureNet(nn.Module):
-    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), noutp_per_class = 10, nneurons_linear_layer = 512,spiking_neuron: callable = None, **kwargs):
+    def __init__(self, channels=128, output_size = 11, input_sizexy =(128,128), noutp_per_class = 10, nneurons_linear_layer = 512, drop_out2d = None, spiking_neuron: callable = None, **kwargs):
         super().__init__()
 
         conv = []
@@ -23,15 +23,19 @@ class myDVSGestureNet(nn.Module):
             conv.append(layer.BatchNorm2d(channels))
             conv.append(spiking_neuron(**deepcopy(kwargs)))
             conv.append(layer.MaxPool2d(2, 2))
+            if drop_out2d is not None:
+                conv.append(layer.Dropout2d(drop_out2d))
+            #conv.append() Its another option to try, it would be necesario to quit the dropout after Flatten()
 
         outp_convx = input_sizexy[0] // (2**nconv_blocks)
         outp_convy = input_sizexy[1] // (2**nconv_blocks)
 
+        conv.append(layer.Flatten())
+        if drop_out2d is None:
+            conv.append(layer.Dropout(0.5))
+            
         self.conv_fc = nn.Sequential(
             *conv,
-
-            layer.Flatten(),
-            layer.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
             layer.Linear(channels * outp_convx * outp_convy, nneurons_linear_layer), 
             spiking_neuron(**deepcopy(kwargs)),
