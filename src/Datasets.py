@@ -1382,6 +1382,11 @@ mad_classes = {
 }
 
 objects_mad = ['cup', 'stone', 'sponge', 'spoon', 'knife']   
+subj_to_idsubj = {'and':1,
+                      'fer':2,
+                      'gui':3,
+                      'kos':4,
+                      'mic':5}
 
 class MAD():
     def __init__(
@@ -1546,7 +1551,7 @@ class MAD():
                 dataset_info = dict()
                 for json_item in jsons_items_files:
                     with open(os.path.join(items_jsons_root,json_item)) as f:
-                        dataset_info[json_item] = json.load(f) 
+                        dataset_info[json_item] = json.load(f)      
                 pll = 0
                 for subject in MAD.list_only_dirs(raw_vid_root):
                     for item in MAD.list_only_dirs(os.path.join(raw_vid_root,subject)):
@@ -1566,8 +1571,8 @@ class MAD():
                                     #os.mkdir(action_class_folder)
 
                                 startf,endf = d['start_frame'],d['end_frame']
-                                 
-                                MAD.jpg_files_to_npz( start = startf, end = endf, input_dir = frames_dir, output_dir = action_class_folder,segment_id = d['segment_id'], subj_id = d['sub_id'])                         
+                                #CARE, the subject id's saved in the jsons doesnt match subject id's from events data. It is necessary to use subjects_to_idsubj dict
+                                MAD.jpg_files_to_npz( start = startf, end = endf, input_dir = frames_dir, output_dir = action_class_folder,segment_id = d['segment_id'], subj = d['subject'])                         
 
             _root = vid_root
             _loader = self.load_npz_video_with_T_frames
@@ -1598,7 +1603,7 @@ class MAD():
         return final_image
 
     @staticmethod
-    def jpg_files_to_npz(start: int, end: int, input_dir: str, output_dir: str,segment_id: int, subj_id: int):
+    def jpg_files_to_npz(start: int, end: int, input_dir: str, output_dir: str,segment_id: int, subj: str):
         frames = []
         #print(f'Start {start}, end {end}, segment_id {segment_id}, subject_id {subj_id}')
         for i in range(start,end+1):
@@ -1606,6 +1611,7 @@ class MAD():
             img = MAD.preprocess_and_load_jpg(os.path.join(input_dir,jpg_name))
             frames.append(img)
         frames = np.array(frames)
+        subj_id = subj_to_idsubj[subj]
         outp_name_file = os.path.join(output_dir,f'S{subj_id}_segment_' + str(segment_id).zfill(3))
         np.savez(outp_name_file, video = frames)
 

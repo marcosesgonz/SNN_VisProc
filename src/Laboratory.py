@@ -140,7 +140,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-            print(f'Mkdir {out_dir}.')
+            print(f'Logs saved in {out_dir}.')
 
         writer = SummaryWriter(out_dir, purge_step=start_epoch)
 
@@ -179,7 +179,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
 
             torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_latest.pth'))
 
-            print(out_dir)
+            #print(out_dir)
             print(f'epoch = {epoch}, train_loss ={train_loss: .4f}, train_acc ={train_acc: .4f}, test_loss ={test_loss: .4f}, test_acc ={test_acc: .4f}, max_test_acc ={max_test_acc: .4f}')    
 
 """project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
