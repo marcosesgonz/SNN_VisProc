@@ -185,7 +185,7 @@ class myDVSGesture3DANN(nn.Module):
                 in_channels = channels
 
             conv.append(nn.Conv3d(in_channels, channels, kernel_size=3, padding=1, bias=False))
-            conv.append(nn.Dropout3d(0.5))
+            #conv.append(nn.Dropout3d(0.2))
             conv.append(nn.BatchNorm3d(channels))
             conv.append(nn.ReLU())
             conv.append(nn.MaxPool3d((1, 2, 2),stride=(1,2,2)))
@@ -199,7 +199,7 @@ class myDVSGesture3DANN(nn.Module):
             *conv,
 
             nn.Flatten(),
-            #nn.Dropout(0.5),
+            nn.Dropout(0.5),
             #En caso de (128,128) de entrada. Lo multiplico por 4x4 debido a que los 5 max pooling(2,2) pasan las matrices de (128,128) a (4,4).
             nn.Linear(channels * outp_convx * outp_convy * outp_convz, nneurons_linear_layer), 
             nn.ReLU(),
