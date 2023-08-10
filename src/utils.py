@@ -61,35 +61,28 @@ def convert_to_3d_eframes(frames) -> np.ndarray:
     return frames
 
 def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0, transform = None):
+    """
+    This functions load train and test splits of dataset classes implemented. CARE: The loading of recorded data is not implemented.
+    """
     relative_root = os.path.basename(input_data)
     if relative_root == 'DVS_Gesture_dataset':
-        train_set = DVS128Gesture(root = input_data, train = True, data_type = datatype, frames_number = time_step, 
-                                  split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
-        test_set = DVS128Gesture(root = input_data, train = False, data_type = datatype, frames_number = time_step, 
-                                 split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
+        dataset = DVS128Gesture
     elif relative_root == 'DVS_Animals_Dataset':
-        train_set = DVSAnimals(root = input_data, train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
-        test_set = DVSAnimals(root = input_data, train = False, data_type = datatype, frames_number = time_step, 
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
+        dataset = DVSAnimals
     elif relative_root == 'DVS_DailyAction_dataset':
-        train_set = DVSDailyActions(root = input_data,train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
-        test_set = DVSDailyActions(root = input_data,train = False, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
+        dataset = DVSDailyActions
     elif relative_root == 'DVS_ActionRecog_dataset':
-        train_set = DVSActionRecog(root = input_data,train = True, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform)  
-        test_set = DVSActionRecog(root = input_data,train = False, data_type = datatype, frames_number = time_step,
-                                    split_by = splitmeth, factor_tau = tau_factor,scale_factor = scale_factor, transform = transform) 
+        dataset = DVSActionRecog
     elif relative_root == 'MAD_dataset':
-        train_set = MAD(root = input_data, train = True, test_subj_id = 1, data_type = datatype, frames_number = time_step,
-                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
-        test_set = MAD(root = input_data, train = False, test_subj_id = 1, data_type = datatype, frames_number = time_step,
-                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
+        dataset = MAD 
     else:
         raise ValueError('Unknown dataset. Could check name of the folder.')
     
+    train_set = dataset(root = input_data, set = 'train', data_type = datatype, frames_number = time_step, 
+                                split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
+    test_set = dataset(root = input_data, set = 'test', data_type = datatype, frames_number = time_step, 
+                                split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform) 
+
     num_classes = len(train_set.classes)
     size_xy = train_set.get_H_W()
     if data_aug_prob != 0:

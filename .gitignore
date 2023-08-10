@@ -8,6 +8,7 @@ data/**/*.txt
 #Quitar imagenes .jpg correspondientes a instancias 
 data/**/*.jpg
 data/**/*.json
+data/DVS_Gesture_dataset/extract/
 /**/*.DS_Store
 *.DS_Store
 *.rar

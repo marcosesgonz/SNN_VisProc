@@ -2,6 +2,8 @@ import torch
 import wandb
 import random
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn.functional as F
+from spikingjelly.activation_based import functional
 from sklearn.model_selection import StratifiedKFold,LeaveOneGroupOut
 import numpy as np
 import os
@@ -21,6 +23,7 @@ def set_seed():
     torch.manual_seed(seed)
     torch.backends.mps.deterministic = True
     torch.backends.cuda.deterministic = True
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gesture_dataset'
 
@@ -347,7 +350,49 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
         wandb.run.summary['mean_train_loss'] = np.mean(results['train_loss'])
 
 
-
+def infer_data(net_name,data,checkpoint_file,frames_num,noutp_per_class = 10, nneurons_linear_layer = 512, channels = 128, neuron_type = 'LIF',drop_out2d = None,
+                resnet_pretrained = False, fine_tuning = False, softm = False, gpu = True, nworkers = 2):
+    """
+    'data' should be a class with the atribute 'classes' and the method 'get_H_W()'
+    """
+    set_seed()
+    nclasses_ = len(data.classes)
+    sizexy = data.get_H_W()
+    val_data_loader = torch.utils.data.DataLoader(
+                            dataset = data, batch_size = 2,
+                            num_workers = nworkers,
+                            drop_last = False, pin_memory = True)
+    
+    device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
+    #Cupy backend if possible
+    cupy = True if device == 'cuda' else False
+    net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
+                    neuron_type = neuron_type, channels = channels, drop_out2d = drop_out2d, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning,
+                    cupy = cupy, softm = softm, num_frames = frames_num)
+    SNNmodel = not net_name.endswith('ANN')
+    dicts = torch.load(checkpoint_file, map_location = torch.device(device))
+    net.load_state_dict(dicts['net'])
+    net.eval()
+    test_loss = 0
+    test_acc = 0
+    test_samples = 0
+    with torch.no_grad():
+        for frame, label in val_data_loader:
+            frame = frame.to(device)
+            if SNNmodel:
+                frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
+            label = label.to(device)
+            label_onehot = F.one_hot(label, nclasses_).float()
+            out_fr = net(frame)
+            loss = F.mse_loss(out_fr, label_onehot)
+            test_samples += label.numel()
+            test_loss += loss.item() * label.numel()
+            test_acc += (out_fr.argmax(1) == label).float().sum().item()
+            if SNNmodel:
+                functional.reset_net(net)
+        test_loss /= test_samples
+        test_acc /= test_samples
+        return test_loss,test_acc
 
 
 """

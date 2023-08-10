@@ -152,7 +152,7 @@ class myDVSGestureRANN(nn.Module):
             )
         else:
             self.classifier = nn.Sequential(
-                nn.ReLU(),
+                #nn.ReLU(),
                 nn.AvgPool1d(noutp_per_class, noutp_per_class)
             )
 

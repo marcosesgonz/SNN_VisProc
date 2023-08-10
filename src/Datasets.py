@@ -13,6 +13,7 @@ import time
 import event_integration_to_frame
 from spikingjelly import configure
 from spikingjelly.datasets import np_savez
+from expelliarmus import Wizard
 import struct
 import tonic
 import random
@@ -21,6 +22,7 @@ import shutil
 import json
 import cv2
 from typing import cast
+from datetime import datetime
 
 
 
@@ -30,7 +32,7 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
     def __init__(
             self,
             root: str,
-            train: bool = None,
+            set: str = None,
             data_type: str = 'event',
             frames_number: int = None,
             split_by: str = None,
@@ -45,11 +47,10 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
         '''
         :param root: root path of the dataset
         :type root: str
-        :param train: whether use the train set. Set ``True`` or ``False`` for those datasets provide train/test
-            division, e.g., DVS128 Gesture dataset. If the dataset does not provide train/test division, e.g., CIFAR10-DVS,
-            please set ``None`` and use :class:`~split_to_train_test_set` function to get train/test set
-        :type train: bool
-        :param data_type: `event` or `frame`
+        :param set: 'train', 'test' or 'recordings'. Use 'recordings' if you have manually recorded files. Put these files in a folder so-called 'recordings' within 'extract' folder.
+             If the dataset does not provide train/test division, e.g., CIFAR10-DVS,please set ``None`` and use :class:`~split_to_train_test_set` function to get train/test set
+        :type set: str
+        :param data_type: `event` or `frame` or 'video'
         :type data_type: str
         :param frames_number: the integrated frame number
         :type frames_number: int
@@ -171,6 +172,19 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
             print(f'Mkdir [{events_np_root}].')
             print(f'Start to convert the origin data from [{extract_root}] to [{events_np_root}] in np.ndarray format.')
             self.create_events_np_files(extract_root, events_np_root)
+        
+        recordings_events_np_root = os.path.join(events_np_root,'recordings')
+        if set == 'recordings' and not os.path.exists(recordings_events_np_root):
+            
+            recordings_extract_root = os.path.join(root,'extract','recordings')       
+            if not os.path.exists(recordings_extract_root):
+                raise FileExistsError(f'Please ensure to put recordings in {recordings_extract_root}')
+            
+            os.mkdir(recordings_events_np_root)
+            print(f'Mkdir {recordings_events_np_root}.')
+            self.create_events_np_files_recordings(recordings_extract_root, recordings_events_np_root)
+            
+            
 
         H, W = self.get_H_W()
 
@@ -321,18 +335,20 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
             _transform = transform
             _target_transform = target_transform
             
-        if train is not None:
-            if train:
+        if set is not None:
+            if set == 'train':
                 _root = os.path.join(_root, 'train')
-            else:
+            elif set == 'test':
                 _root = os.path.join(_root, 'test')
+            elif set == 'recordings':
+                _root = os.path.join(_root,'recordings')
         else:
-            _root = self.set_root_when_train_is_none(_root)
+            _root = self.set_root_when_set_is_none(_root)
 
         super().__init__(root=_root, loader=_loader, extensions=('.npz', ), transform=_transform, #Habría que añadir en extensions .npy si se quiere trabajar directamente con eventos
                          target_transform=_target_transform)
 
-    def set_root_when_train_is_none(self, _root: str):
+    def set_root_when_set_is_none(self, _root: str):
         return _root
 
     @staticmethod
@@ -385,6 +401,19 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
 
     @staticmethod
     @abstractmethod
+    def create_events_np_files_recordings(extract_root_records: str, events_np_root_records: str):
+        '''
+        :param extract_root_records: Root directory path which saves extracted files from records
+        :type extract_root: str
+        :param events_np_root_records: Root directory path which saves events files in the ``npz`` format
+        :type events_np_root:
+        :return: None
+        This function defines how to convert the origin binary data of records in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
+        '''
+        pass
+
+    @staticmethod
+    @abstractmethod
     def get_H_W() -> Tuple:
         '''
         :return: A tuple ``(H, W)``, where ``H`` is the height of the data and ``W`` is the weight of the data.
@@ -408,7 +437,7 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
     def __init__(
             self,
             root: str,
-            train: bool = None,
+            set: str = None,
             data_type: str = 'event',
             frames_number: int = None,
             split_by: str = None,
@@ -420,8 +449,8 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
             factor_tau: float = 0.8,
             scale_factor: int = 50
     ) -> None:
-        assert train is not None
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
+        assert set is not None
+        super().__init__(root, set, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -507,7 +536,7 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
     @staticmethod
     def create_events_np_files(extract_root: str, events_np_root: str):
         '''
-        :param extract_root: Root directory path which saves extracted files from downloaded files
+        :param extract_root: Root directory path which saves extracted files from downloaded files or recordings
         :type extract_root: str
         :param events_np_root: Root directory path which saves events files in the ``npz`` format
         :type events_np_root:
@@ -517,9 +546,10 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
         '''
         aedat_dir = os.path.join(extract_root, 'DvsGesture')
         train_dir = os.path.join(events_np_root, 'train')
-        test_dir = os.path.join(events_np_root, 'test')
         os.mkdir(train_dir)
+        test_dir = os.path.join(events_np_root, 'test')
         os.mkdir(test_dir)
+        
         print(f'Mkdir [{train_dir, test_dir}.')
         for label in range(11):
             os.mkdir(os.path.join(train_dir, str(label)))
@@ -550,6 +580,73 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
 
             print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
         print(f'All aedat files have been split to samples and saved into [{train_dir, test_dir}].')
+
+    @staticmethod
+    def create_events_np_files_recordings(extract_root_records: str, events_np_root_records: str):
+        '''
+        :param extract_root: Root directory path which saves extracted files from downloaded files or recordings
+        :type extract_root: str
+        :param events_np_root: Root directory path which saves events files in the ``npz`` format
+        :type events_np_root:
+        :return: None
+
+        This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
+        '''
+        for label in range(11):
+            os.mkdir(os.path.join(events_np_root_records, str(label)))
+        print(f'Mkdir {os.listdir(events_np_root_records)} in [{events_np_root_records}].')
+
+        #The labels for sorted files:
+        labels = [0] + [i for i in range(11) for n in range(3)] + [i for i in range(11)] 
+        def extract_datetime(filename):
+            filename = filename.split('.')[0]
+            parts = filename.split('_')
+            date_str, time_str = parts[1], parts[2]
+            datetime_str = f"{date_str} {time_str.replace('-', ':')}"
+            return datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
+        sorted_file_names = sorted([it.name for it in os.scandir(extract_root_records) if it.name.endswith('.raw')],key = extract_datetime)
+        for k,sample in enumerate(sorted_file_names):
+                obj = Wizard(encoding='EVT2')
+                events = obj.read(os.path.join(extract_root_records,sample))
+                events_dict = dict()
+                events_dict['t'] = []
+                events_dict['x'] = []
+                events_dict['y'] = []
+                events_dict['p'] = []
+                for i,event in enumerate(events):
+                    if event[1]>=80 and event[1]<560:  #Only save cropped area. From 640 width to 480 width.
+                        event[1] -= 80                 #Right now, events are within 480x480 grid
+                        #Reescale from 480x480 to 128x128
+                        event[1] = int(event[1]*127/479)
+                        event[2] = int(event[2]*127/479)
+                        events_dict['t'].append(event[0])
+                        events_dict['x'].append(event[1])
+                        events_dict['y'].append(event[2])
+                        events_dict['p'].append(event[3])
+                
+                #clean noise data, the recordings lasted no more than 20 seconds
+                times = np.array(events_dict['t'])*1e-6 #Expressed in seconds
+                duration = (times[-1]- times[0])
+                times_mask = ( np.abs(times - np.mean(times)) < 10) if duration > 20 else [True for n in range(len(times))]
+                print('Deleted time stamps(s): ',times[np.bitwise_not(times_mask)]*1e6, end=' ')
+                for key in events_dict.keys():
+                        events_dict[key] = np.array(events_dict[key])[times_mask]
+
+                print('Duration(s): ',(events_dict['t'][-1]-events_dict['t'][0])*1e-6)
+                #HAY QUE INCLUIR AQUÍ EL CÓDIGO PARA PONER QUÉ 'label' EXACTAMENTE LE CORRESPONDE A CADA INSTANCIA !!!!!!!!!!!!!!
+                label = labels[k]
+                file_name = os.path.join(events_np_root_records, str(label), os.path.splitext(sample)[0] + '.npz')
+                np.savez(file_name,
+                        t = events_dict['t'],
+                        x = events_dict['x'],
+                        y = events_dict['y'],
+                        p = events_dict['p']
+                        )
+                print(f'[{file_name}] saved.')
+
+        print(f'All recorded files have been saved into [{events_np_root_records}].')
+
+
 
     @staticmethod
     def get_H_W() -> Tuple:
@@ -1591,7 +1688,7 @@ class MAD():
                 self.data = self.data[self.subjects == test_subj_id]
                 self.subjects[self.subjects == test_subj_id]
 
-    def set_root_when_train_is_none(self, _root: str):
+    def set_root_when_set_is_none(self, _root: str):
         return _root
     
     def load_npz_video_with_T_frames(self,file_name):
