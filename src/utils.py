@@ -8,6 +8,10 @@ from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture,
 from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN, myDVSGesture3DANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import matplotlib.markers as markers
+import seaborn as sns
 
 #set the seed for reproducibility
 seed = 310
@@ -235,3 +239,53 @@ def test_model(net, n_classes,tst_loader,
         return test_loss,test_acc
 
 
+def create_confusion_matrix(y_true, y_pred, categories = False, sublabels = False,marker_size = 10,title = '',sublabels_names = None,
+                            xfonts = 10, xrot = 24, yfonts = 10, yrot = 15, **kwargs):
+    conf_m = confusion_matrix(y_true = y_true,y_pred = y_pred)
+    nclasses = len(np.unique(y_true))
+
+    
+    plt.figure(**kwargs)
+    sns.heatmap(conf_m,annot = True, fmt = '')  
+    if sublabels != False:
+
+        subcat_markers = [markers.MarkerStyle('*'),markers.MarkerStyle('o'),markers.MarkerStyle('s'), markers.MarkerStyle('D'), markers.MarkerStyle('^'),
+                markers.MarkerStyle('v'), markers.MarkerStyle('<'), markers.MarkerStyle('>'),markers.MarkerStyle('p')]
+        
+        subcategories = set(sublabels) if sublabels_names == None else sublabels_names
+        subcategory_markers = {subcat:subcat_markers[i] for i,subcat in enumerate(subcategories)}
+        
+        sublabels_conf_m = [[[] for n in range(nclasses)] for n in range(nclasses)]
+        max_subcats_in_cell = 0
+        for label,pred,sublabel in zip(y_true,y_pred,sublabels):
+            sublabels_conf_m[label][pred].append(sublabel)
+
+            if len(sublabels_conf_m[label][pred]) > max_subcats_in_cell:
+                max_subcats_in_cell = len(sublabels_conf_m[label][pred])
+
+        len1d_per_cell = np.sqrt(max_subcats_in_cell)
+        len_x_per_cell, len_y_per_cell = (len1d_per_cell,len1d_per_cell) if len1d_per_cell == int(len1d_per_cell) else ((int(len1d_per_cell) + 1), int(len1d_per_cell))
+        for i in range(nclasses):
+            for j in range(nclasses):
+                cell_value = conf_m[i,j]
+                if cell_value > 0:
+                    subcategories_present = sublabels_conf_m[i][j]
+                    assert cell_value == len(subcategories_present)
+                    y_start = i + 0.5 
+                    x_start = j + 0.5
+                    dx_dy_s = [(dx,dy) for dy in np.linspace(0.3,-0.3,len_y_per_cell) for dx in np.linspace(-0.3,0.3,len_x_per_cell)]
+                    for idx, subcategory in enumerate(subcategories_present):
+                        marker = subcategory_markers[subcategory]
+                        y = y_start + dx_dy_s[idx][1]
+                        x = x_start + dx_dy_s[idx][0]
+                        plt.plot(x, y, marker=marker, markersize=marker_size,markeredgecolor='black', color='white')
+
+        legend_handles = [plt.Line2D([0], [0], marker=marker, color='w',markeredgecolor='black', markerfacecolor='white', markersize = marker_size, label=subcategory) for subcategory, marker in subcategory_markers.items()]
+        plt.legend(handles=legend_handles, title='Subetiquetas', bbox_to_anchor=(1.3, 1))
+    plt.title(title)
+    acc = np.mean(y_true == y_pred)
+    plt.xlabel('Predicted label\n\nAccuracy %.2f'%(acc*100),fontsize=14)
+    plt.ylabel('True label', fontsize=14)
+    plt.xticks(np.arange(0.5, 11.5), labels=categories, rotation = 24, fontsize = xfonts)
+    plt.yticks(np.arange(0.5, 11.5), labels=categories, rotation = yrot, fontsize = yfonts)
+    plt.tight_layout()

@@ -1,4 +1,5 @@
 spikingjelly_alias
+*.png
 *.csv
 *.aedat
 *.npz

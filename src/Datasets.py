@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 from torchvision.datasets import utils
 from abc import abstractmethod
@@ -205,6 +205,26 @@ class MyNeuromorphicDatasetFolder(DatasetFolder):
                     frames_np_root = os.path.join(root, f'frames_number_{frames_number}_split_by_{split_by}')
                 if os.path.exists(frames_np_root):
                     print(f'The directory [{frames_np_root}] already exists.')
+                    if set == 'recordings' and not os.path.exists(os.path.join(frames_np_root,'recordings')):
+                        print('Recording directory doesnt exist. Creating frame files for recordings...')
+                        recordings_frames_np_root = os.path.join(frames_np_root,'recordings')
+                        os.mkdir(recordings_frames_np_root)
+                        sjds.create_same_directory_structure(recordings_events_np_root,recordings_frames_np_root)
+                        # use multi-thread to accelerate
+                        t_ckp = time.time()
+                        with ThreadPoolExecutor(max_workers=configure.max_threads_number_for_datasets_preprocess) as tpe:
+                            print(f'Start ThreadPoolExecutor with max workers = [{tpe._max_workers}].')
+                            for e_root, e_dirs, e_files in os.walk(recordings_events_np_root):
+                                if e_files.__len__() > 0:
+                                    output_dir = os.path.join(frames_np_root, os.path.relpath(e_root, events_np_root))
+                                    for e_file in e_files:
+                                        if e_file.endswith('.npz'):  
+                                            events_np_file = os.path.join(e_root, e_file)
+                                            print(f'Start to integrate [{events_np_file}] to frames and save to [{output_dir}].')
+                                            tpe.submit(event_integration_to_frame.integrate_events_to_frame_wfixed_frames_num,
+                                                        self.load_events_np, events_np_file, output_dir, split_by, frames_number, H, W,print_save= True,
+                                                        factor_tau = factor_tau, scale_factor = scale_factor)
+                        print(f'Used time = [{round(time.time() - t_ckp, 2)}s].')
                 else:
                     os.mkdir(frames_np_root)
                     print(f'Mkdir [{frames_np_root}].')
@@ -451,6 +471,34 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
     ) -> None:
         assert set is not None
         super().__init__(root, set, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
+    
+    """
+    #This function should be used if the folder names corresponds to the label id's. In other case, the label id's will not correspond with the label put it in the names of folders.
+    def find_classes(self, directory: str) -> Tuple[List[str], Dict[str, int]]:
+        #Finds the class folders in a dataset. The name of the folders corresponds to the label id.
+
+        #See :class:`DatasetFolder` for details.
+        
+        classes = [entry.name for entry in os.scandir(directory) if entry.is_dir()]
+        if not classes:
+            raise FileNotFoundError(f"Couldn't find any class folder in {directory}.")
+
+        class_to_idx = {cls_name: int(cls_name) for cls_name in classes}
+        return classes, class_to_idx
+    """
+    def find_classes(self, directory: str) -> Tuple[List[str], Dict[str, int]]:
+        #Finds the class folders in a dataset. The name of the folders corresponds to the label id.
+
+        #See :class:`DatasetFolder` for details.
+        classes = ['hand clap','rh wave','other','lh wave','rh cw','rh ccw','lh cw','lh ccw','arm roll','air drums','air guitar']
+        classes_scan = [entry.name for entry in os.scandir(directory) if entry.is_dir()]
+        for class_ in classes:
+            if class_ not in classes_scan:
+                raise FileNotFoundError(f"Couldn't find class {class_} folder in {directory}.")
+
+        class_to_idx = {cls_name: i for i,cls_name in enumerate(classes)}
+        return classes, class_to_idx
+
     @staticmethod
     def resource_url_md5() -> list:
         '''
@@ -511,6 +559,9 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
 
         # Note that there are some files that many samples have the same label, e.g., user26_fluorescent_labels.csv
         label_file_num = [0] * 11
+        #The classes in the order of label id's put it in the csv's. 
+        classes_csv_order = ['hand clap', 'rh wave', 'lh wave', 'rh cw', 'rh ccw', 'lh cw','lh ccw', 'arm roll', 'air drums', 'air guitar', 'other']
+        #classes = ['hand clap', 'rh wave','other','lh wave','rh cw','rh ccw','lh cw','lh ccw','arm roll','air drums','air guitar']
 
         # There are some wrong time stamp in this dataset, e.g., in user22_led_labels.csv, ``endTime_usec`` of the class 9 is
         # larger than ``startTime_usec`` of the class 10. So, the following codes, which are used in old version of SpikingJelly,
@@ -519,10 +570,11 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
         for i in range(csv_data.shape[0]):
             # the label of DVS128 Gesture is 1, 2, ..., 11. We set 0 as the first label, rather than 1
             label = csv_data[i][0] - 1
+            class_label = classes_csv_order[label]
             t_start = csv_data[i][1]
             t_end = csv_data[i][2]
             mask = np.logical_and(events['t'] >= t_start, events['t'] < t_end)
-            file_name = os.path.join(output_dir, str(label), f'{fname}_{label_file_num[label]}.npz')
+            file_name = os.path.join(output_dir, class_label, f'{fname}_{label_file_num[label]}.npz')
             np_savez(file_name,
                      t=events['t'][mask],
                      x=events['x'][mask],
@@ -551,9 +603,10 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
         os.mkdir(test_dir)
         
         print(f'Mkdir [{train_dir, test_dir}.')
-        for label in range(11):
-            os.mkdir(os.path.join(train_dir, str(label)))
-            os.mkdir(os.path.join(test_dir, str(label)))
+        classes_csv_order = ['hand clap', 'rh wave', 'lh wave', 'rh cw', 'rh ccw', 'lh cw','lh ccw', 'arm roll', 'air drums', 'air guitar', 'other']
+        for label in classes_csv_order:
+            os.mkdir(os.path.join(train_dir, label))
+            os.mkdir(os.path.join(test_dir, label))
         print(f'Mkdir {os.listdir(train_dir)} in [{train_dir}] and {os.listdir(test_dir)} in [{test_dir}].')
 
         with open(os.path.join(aedat_dir, 'trials_to_train.txt')) as trials_to_train_txt, open(
@@ -592,20 +645,16 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
 
         This function defines how to convert the origin binary data in ``extract_root`` to ``npz`` format and save converted files in ``events_np_root``.
         '''
-        for label in range(11):
-            os.mkdir(os.path.join(events_np_root_records, str(label)))
+        classes = ['hand clap','rh wave','other','lh wave','rh cw','rh ccw','lh cw','lh ccw','arm roll','air drums','air guitar']
+        for label in classes:
+            os.mkdir(os.path.join(events_np_root_records, label))
         print(f'Mkdir {os.listdir(events_np_root_records)} in [{events_np_root_records}].')
 
         #The labels for sorted files:
-        labels = [0] + [i for i in range(11) for n in range(3)] + [i for i in range(11)] 
-        def extract_datetime(filename):
-            filename = filename.split('.')[0]
-            parts = filename.split('_')
-            date_str, time_str = parts[1], parts[2]
-            datetime_str = f"{date_str} {time_str.replace('-', ':')}"
-            return datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
-        sorted_file_names = sorted([it.name for it in os.scandir(extract_root_records) if it.name.endswith('.raw')],key = extract_datetime)
-        for k,sample in enumerate(sorted_file_names):
+        #labels = [0] + [i for i in range(11) for n in range(3)] + [i for i in range(11)] 
+        #labels = [0]*4 + [1]*3 + [10]*3 + [i for i in range(2,10) for n in range(3)] + [0] + [1] + [10] + [i for i in range(2,10)] 
+        file_names = [it.name for it in os.scandir(extract_root_records) if it.name.endswith('.raw')]
+        for sample in file_names:
                 obj = Wizard(encoding='EVT2')
                 events = obj.read(os.path.join(extract_root_records,sample))
                 events_dict = dict()
@@ -613,7 +662,7 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
                 events_dict['x'] = []
                 events_dict['y'] = []
                 events_dict['p'] = []
-                for i,event in enumerate(events):
+                for event in events:
                     if event[1]>=80 and event[1]<560:  #Only save cropped area. From 640 width to 480 width.
                         event[1] -= 80                 #Right now, events are within 480x480 grid
                         #Reescale from 480x480 to 128x128
@@ -633,9 +682,9 @@ class DVS128Gesture(MyNeuromorphicDatasetFolder):
                         events_dict[key] = np.array(events_dict[key])[times_mask]
 
                 print('Duration(s): ',(events_dict['t'][-1]-events_dict['t'][0])*1e-6)
-                #HAY QUE INCLUIR AQUÍ EL CÓDIGO PARA PONER QUÉ 'label' EXACTAMENTE LE CORRESPONDE A CADA INSTANCIA !!!!!!!!!!!!!!
-                label = labels[k]
-                file_name = os.path.join(events_np_root_records, str(label), os.path.splitext(sample)[0] + '.npz')
+                #OJO ESTA ETIQUETA SE COMPROBÓ DESPUÉS QUE ES FALSA. SOLO SIRVE PARA ENVIAR EL SAMPLE A LA CARPETA CORRESPONDIENTE(el nombre de las carpetas no corresponden con las de las etiquetas reales)
+                label = int(sample.split('_')[0])
+                file_name = os.path.join(events_np_root_records, classes[label], os.path.splitext(sample)[0] + '.npz')
                 np.savez(file_name,
                         t = events_dict['t'],
                         x = events_dict['x'],
@@ -1489,8 +1538,8 @@ class MAD():
     def __init__(
             self,
             root: str,
-            train: bool = True,
-            test_subj_id: int = None,
+            set: str = None,
+            test_subj_id: int = 1,
             data_type: str = 'event',
             frames_number: int = None,
             split_by: str = None,
@@ -1503,7 +1552,7 @@ class MAD():
             scale_factor: int = 50
     ) -> None:
         """
-        If test_sub_id is not specified, full dataset will be loaded. If else, it depends in train bool value (train/test split)
+        If set is not specified, full dataset will be loaded. Set possible values are 'train' and 'test'.
         """
         self.n_steps = frames_number
         events_np_root = os.path.join(root, 'events_np')
@@ -1679,12 +1728,12 @@ class MAD():
         self.classes, self.class_to_idx = self.find_classes()
         self.data,self.subjects = self.make_dataset(directory = _root,class_to_idx = self.class_to_idx, extensions = ('.npz','.npy'))
 
-        if test_subj_id is not None:
+        if set is not None:
             assert test_subj_id in [1,2,3,4,5]
-            if train:
+            if set == 'train':
                 self.data = self.data[self.subjects != test_subj_id]
                 self.subjects[self.subjects != test_subj_id]
-            else:
+            elif set == 'test':
                 self.data = self.data[self.subjects == test_subj_id]
                 self.subjects[self.subjects == test_subj_id]
 

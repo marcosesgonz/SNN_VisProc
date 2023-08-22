@@ -8,6 +8,7 @@ from sklearn.model_selection import StratifiedKFold,LeaveOneGroupOut
 import numpy as np
 import os
 from utils import load_net,loading_data,test_model,train_model,reset_weights, num_trainable_params, convert_to_3d_eframes
+from sklearn.metrics import confusion_matrix
 #set the seed for reproducibility
 seed = 310
 try:
@@ -106,7 +107,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
             pin_memory=True
         )
         print('Using %s as device'% device)
-        print('Applying 2d to 3d conversion to frames.')
+        print('Applying 2d to 3d conversion to frames.') if net_name == 'resnet18' and data_type == 'frame' else None
         print('SNN model: ',SNNmodel)
         print('Number of trainable paramenters:  %.6e'%n_params)
         print('Tamaño de imágenes',sizexy,'\nNúmero de clases: ',nclasses_,'\nNº instancias train/test:', train_size_,'/', test_size_)
@@ -351,16 +352,20 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
 
 
 def infer_data(net_name,data,checkpoint_file,frames_num,noutp_per_class = 10, nneurons_linear_layer = 512, channels = 128, neuron_type = 'LIF',drop_out2d = None,
-                resnet_pretrained = False, fine_tuning = False, softm = False, gpu = True, nworkers = 2):
+                resnet_pretrained = False, fine_tuning = False, softm = False, gpu = True, nworkers = 2, use_sublabels = True, batch_size_ = 8, return_acc = False):
     """
-    'data' should be a class with the atribute 'classes' and the method 'get_H_W()'
+    'data' should be a class with the atribute 'classes' and 'samples'(if it is used sublabels) and the method 'get_H_W()'. 
     """
     set_seed()
     nclasses_ = len(data.classes)
     sizexy = data.get_H_W()
+
+    if use_sublabels:
+        sublabels = [os.path.splitext(os.path.basename(sample[0]).split('_')[1])[0] for sample in data.samples]
+
     val_data_loader = torch.utils.data.DataLoader(
-                            dataset = data, batch_size = 2,
-                            num_workers = nworkers,
+                            dataset = data, batch_size = batch_size_,
+                            num_workers = nworkers,shuffle = False, #Shuffle false it is important to preserve the order of data.samples in the dataloader
                             drop_last = False, pin_memory = True)
     
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
@@ -372,27 +377,48 @@ def infer_data(net_name,data,checkpoint_file,frames_num,noutp_per_class = 10, nn
     SNNmodel = not net_name.endswith('ANN')
     dicts = torch.load(checkpoint_file, map_location = torch.device(device))
     net.load_state_dict(dicts['net'])
+    net.to(device)
     net.eval()
-    test_loss = 0
-    test_acc = 0
-    test_samples = 0
+    #test_loss = 0
+    #test_acc = 0
+    #test_samples = 0
+    all_preds = []
+    all_labels = []
     with torch.no_grad():
-        for frame, label in val_data_loader:
+        for i,(frame, label) in enumerate(val_data_loader):
+            #print(label)
             frame = frame.to(device)
             if SNNmodel:
                 frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
             label = label.to(device)
-            label_onehot = F.one_hot(label, nclasses_).float()
+            #label_onehot = F.one_hot(label, nclasses_).float()
             out_fr = net(frame)
-            loss = F.mse_loss(out_fr, label_onehot)
-            test_samples += label.numel()
-            test_loss += loss.item() * label.numel()
-            test_acc += (out_fr.argmax(1) == label).float().sum().item()
+            #loss = F.mse_loss(out_fr, label_onehot)
+            #test_samples += label.numel()
+            #test_loss += loss.item() * label.numel()
+            #test_acc += (out_fr.argmax(1) == label).float().sum().item()
             if SNNmodel:
                 functional.reset_net(net)
-        test_loss /= test_samples
-        test_acc /= test_samples
-        return test_loss,test_acc
+
+            all_preds.append(out_fr.argmax(1).cpu().numpy())
+            all_labels.append(label.cpu().numpy())
+
+
+        #test_loss /= test_samples
+        #test_acc /= test_samples
+
+        all_preds = np.concatenate(all_preds)
+        all_labels = np.concatenate(all_labels)
+        
+        #confusion = confusion_matrix(all_labels, all_preds)
+        if return_acc:
+            return np.mean(all_labels==all_preds)
+        elif use_sublabels:
+            return all_labels,all_preds,sublabels
+        else:
+            return all_labels,all_preds
+        #return  test_acc, confusion
+        
 
 
 """
