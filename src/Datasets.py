@@ -710,7 +710,7 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
     def __init__(
             self,
             root: str,
-            train: bool = True,
+            set: str = 'train',
             data_type: str = 'event',
             frames_number: int = None,
             split_by: str = None,
@@ -734,7 +734,7 @@ class DVSAnimals(MyNeuromorphicDatasetFolder):
         for label in labels_load:
             labels_defs[int(label[0]) - 1] = label[1]
         self.classes_def = labels_defs
-        super().__init__(root, train, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
+        super().__init__(root, set, data_type, frames_number, split_by, duration, custom_integrate_function, custom_integrated_frames_dir_name, transform, target_transform,factor_tau,scale_factor)
 
 
     @staticmethod

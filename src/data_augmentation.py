@@ -403,6 +403,7 @@ class EventMix(Dataset):
                  noise=0.1,         #Cantidad de ruido a añadir con sal y pimienta(haría falta el paquete brain_cog)
                  vis=False,         #Devolver las imágenes y máscara si True
                  gaussian_n=None,   #Número de gaussianas
+                 mix_strategy = 'num_events',
                  **kwargs):
         self.dataset = dataset
         self.num_class = num_class
@@ -413,10 +414,13 @@ class EventMix(Dataset):
         self.noise = noise
         self.vis = vis
         self.gaussian_n = gaussian_n
-        print(self.prob, self.gaussian_n, self.beta)
+        self.mix_strategy = mix_strategy
+        print(f'Using mix strategy {self.mix_strategy}')
+        #print(self.prob, self.gaussian_n, self.beta)
 
     def __getitem__(self, index):
         img, lb = self.dataset[index]
+        img = torch.tensor(img,dtype = torch.float32)
         lb_onehot = onehot(self.num_class, lb)
 
         shape = img.shape
@@ -437,6 +441,7 @@ class EventMix(Dataset):
                 rand_index = random.choice(self.indices)
 
             img2, lb2 = self.dataset[rand_index]
+            img2 = torch.tensor(img2,dtype = torch.float32)
             lb2_onehot = onehot(self.num_class, lb2)
             # shape: step, channel, height, width
             # alpha = np.random.rand()
@@ -446,32 +451,38 @@ class EventMix(Dataset):
             # mask = temporal_mask(shape, 1. - lam)
             # else:
             # mask = st_mask(shape, 1. - lam)
-            mask = GMM_mask(shape, 1. - lam, self.gaussian_n)
+            mask = GMM_mask(shape, 1. - lam, self.gaussian_n)   #Se coge 1 - lam ya que cuenta el (1-lam)*size'ésimo elemnto más pequeño. Que corresponde con el lam*size'ésimo elemento más alto.
             # mask = GMM_mask_clip(shape, 1. - lam)
             # mask = torch.logical_not(mask)
 
             # lam = 1 - (mask.sum() / np.prod(img.shape))  #  area
-            lam = calc_masked_lam(img, img2, mask)  # count
-            img[mask] = img2[mask]  # count && mask required
+            
+            #img[mask] = img2[mask]  # count && mask required
 
             # distance
-            # mix = torch.clone(img)
-            # if self.vis:
-            #     mix[mask] = -img2[mask]
-            #     img2 = -img2
-            # else:
-            #     mix[mask] = img2[mask]
-            # lam = calc_masked_lam_with_difference(img, img2, mix, kernel_size=3)
-            # img = mix
+            mix = torch.clone(img)
+            if self.vis:
+                 mix[mask] = -img2[mask]
+                 img2 = -img2
+            else:
+                 mix[mask] = img2[mask]
+            
+            if self.mix_strategy == 'mse':
+                lam = calc_masked_lam_with_difference(img, img2, mix, kernel_size=3)
+            elif self.mix_strategy == 'num_events':
+                lam = calc_masked_lam(img, img2, mask)  # count
+           
+            img = mix
+
             if self.noise != 0:
-                img = mySaltAndPepperNoise(img, self.noise)  #Función implementada por mi
+                img = SaltAndPepperNoise(img, self.noise)  #Función implementada por mi si pone MySaltAndPepperNoise (funciona con numpy en vez de torch)
 
             lb_onehot = lb_onehot * lam + lb2_onehot * (1. - lam)
 
         if self.vis:
             return origin, img, img2, mask
         else:
-            return img, lb_onehot
+            return np.array(img).astype('float32'), lb_onehot
         
     def create_samples(self,proportion):  #This function is created by me. In first instance, this isnt necessary.
         idx_samples = list(range(len(self)))

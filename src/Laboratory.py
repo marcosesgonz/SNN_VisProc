@@ -32,7 +32,7 @@ data_dir = '/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/data/DVS_Gest
 def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = 'number', batch_size = 8, data_type = 'frame',
                         epochs = 30,gpu = True,lr = 0.1, ler_rate_type = 'CosAnn',inp_data= data_dir, neuron_type = 'LIF',noutp_per_class = 10, nneurons_linear_layer = 512,
                         net_name = 'DVSG_net',run_id = None, split_tr_tst = True, softm = False, channels = 128, drop_out2d = None, resnet_pretrained = False, fine_tuning = False,
-                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0,
+                        factor_tau = 0.8 , scale_factor = 50, data_aug_prob = 0, mix_strategy = 'num_events'
                         ):
     set_seed()
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
@@ -44,7 +44,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     train_set,test_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type,
                                                          splitmeth = splitby, tr_tst_split = split_tr_tst,
                                                          tau_factor = factor_tau, scale_factor = scale_factor,
-                                                         data_aug_prob = data_aug_prob, transform = transform_)
+                                                         data_aug_prob = data_aug_prob,mix_strategy=mix_strategy, transform = transform_)
     train_size_,test_size_ = len(train_set),len(test_set)
     #Arquitectura de red que se va a usar, modo multipaso 'm' por defecto
     cupy = True if device == 'cuda' else False
@@ -195,7 +195,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
                         epochs = 65, gpu = True,lr = 0.1, ler_rate_type = 'CosAnn', inp_data = data_dir, neuron_type = 'LIF', net_name = 'DVSG_net',
                          noutp_per_class = 10, nneurons_linear_layer = 512, resnet_pretrained = False, fine_tuning = False,
                         run_id = None, kfolds = 5, factor_tau = 0.8 , scale_factor = 50, 
-                        data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = False
+                        data_aug_prob = 0, nworkers = 2, pinmemory = True, softm = False, mix_strategy = 'num_events'
                         ):
     set_seed()
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
@@ -208,7 +208,7 @@ def execute_experiment_kfold(project_ref, name_experim, T = 16, splitby = 'numbe
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
     data_set, nclasses_, sizexy = loading_data(input_data = inp_data,time_step = T, datatype = data_type, splitmeth = splitby,tr_tst_split = False,
-                                                         tau_factor = factor_tau,scale_factor= scale_factor, data_aug_prob = data_aug_prob, transform = transform_)
+                                                         tau_factor = factor_tau,scale_factor= scale_factor, data_aug_prob = data_aug_prob, mix_strategy = mix_strategy,transform = transform_)
     data_size = len(data_set)
     #Registro en wandb para la monitorización
     wandb.login()

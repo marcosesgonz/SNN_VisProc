@@ -64,7 +64,7 @@ def convert_to_3d_eframes(frames) -> np.ndarray:
     frames = np.concatenate((frames,mean_channel_frames), axis = 1)
     return frames
 
-def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0, transform = None):
+def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'number',tr_tst_split = True,tau_factor = 0.8,scale_factor = 50, data_aug_prob = 0,mix_strategy = 'num_events', transform = None):
     """
     This functions load train and test splits of dataset classes implemented. CARE: The loading of recorded data is not implemented.
     """
@@ -92,7 +92,7 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
     if data_aug_prob != 0:
         #OJO, EventMix da ya las etiquetas con one_hot encoding al tener que mixear etiquetas para aumentar datos.
         train_set = EventMix(dataset=train_set, num_class = num_classes, num_mix = 1,
-                             beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3) 
+                             beta = 1, prob = data_aug_prob, noise = 0.05, gaussian_n = 3, mix_strategy = mix_strategy) 
         print('Using data augmentation with %.2f prob'%data_aug_prob)
 
     if tr_tst_split:
