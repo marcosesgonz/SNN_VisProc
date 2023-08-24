@@ -437,9 +437,13 @@ class EventMix(Dataset):
 
             if self.indices is None:  #Si no se le da un rango de índices, eligirá para mezclar otro dato aleatorio del dataset
                 rand_index = random.choice(range(len(self))) 
+                while rand_index == index:
+                    print('Match of two indices encountered!, rechoicing...')
+                    rand_index = random.choice(range(len(self)))
             else:
                 rand_index = random.choice(self.indices)
-
+                while rand_index == index:
+                    rand_index = random.choice(self.indices)
             img2, lb2 = self.dataset[rand_index]
             img2 = torch.tensor(img2,dtype = torch.float32)
             lb2_onehot = onehot(self.num_class, lb2)
@@ -473,11 +477,13 @@ class EventMix(Dataset):
                 lam = calc_masked_lam(img, img2, mask)  # count
            
             img = mix
-
+            if torch.all(lb_onehot.isnan()):
+                print(f'TODOS LOS VALORES SON NAN: label = {lb_onehot}, coef = {lam}, equal images ? {torch.all(img == img2)}')
             if self.noise != 0:
                 img = SaltAndPepperNoise(img, self.noise)  #Función implementada por mi si pone MySaltAndPepperNoise (funciona con numpy en vez de torch)
 
             lb_onehot = lb_onehot * lam + lb2_onehot * (1. - lam)
+
 
         if self.vis:
             return origin, img, img2, mask
