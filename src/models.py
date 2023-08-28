@@ -12,7 +12,6 @@ class myDVSGestureNet(nn.Module):
 
         conv = []
         nconv_blocks = 5         # = int(np.min(np.log2(np.array(input_sizexy) / desired_output))) , desired_ouput = 4
-        print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 2
@@ -60,7 +59,6 @@ class myDVSGestureANN(nn.Module):
         super().__init__()
         conv = []
         nconv_blocks = 5
-        print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 1
@@ -118,7 +116,6 @@ class myDVSGestureRANN(nn.Module):
         super().__init__()
         conv = []
         nconv_blocks = 5
-        print('Number of conv_blocks:',nconv_blocks)
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 1
@@ -173,11 +170,11 @@ class myDVSGestureRANN(nn.Module):
 
 
 class myDVSGesture3DANN(nn.Module):
-    def __init__(self, channels = 48, output_size = 11, input_sizexy =(128,128), num_frames = 22, noutp_per_class = 10, nneurons_linear_layer = 512, softm = False):
+    def __init__(self, channels = 96, output_size = 11, input_sizexy =(128,128), num_frames = 22, noutp_per_class = 10, nneurons_linear_layer = 512, softm = False):
         super().__init__()
         conv = []
         nconv_blocks = 5
-        print('Number of conv_blocks:',nconv_blocks)
+        outp_convz = num_frames
         for i in range(nconv_blocks):
             if conv.__len__() == 0:
                 in_channels = 1
@@ -188,12 +185,15 @@ class myDVSGesture3DANN(nn.Module):
             #conv.append(nn.Dropout3d(0.2))
             conv.append(nn.BatchNorm3d(channels))
             conv.append(nn.ReLU())
-            conv.append(nn.MaxPool3d((1, 2, 2),stride=(1,2,2)))
-
+            if outp_convz > 1:
+                conv.append(nn.MaxPool3d((2, 2, 2),stride=(2,2,2)))
+                outp_convz= outp_convz//2
+            else:
+                conv.append(nn.MaxPool3d((1, 2, 2),stride=(1,2,2)))
+            
 
         outp_convx = input_sizexy[0] // (2**nconv_blocks)
         outp_convy = input_sizexy[1] // (2**nconv_blocks)
-        outp_convz = num_frames
         #print('output_convs(x,y,z):',outp_convx,outp_convy,outp_convz)
         self.conv_fc = nn.Sequential(
             *conv,

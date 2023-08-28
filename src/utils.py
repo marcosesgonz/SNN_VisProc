@@ -107,7 +107,7 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
             return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, drop_out2d = None,
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, drop_out2d = None, verbose = True,
               noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, channels = 128, resnet_pretrained = False, fine_tuning = False):
 
     possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
@@ -122,7 +122,7 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             neuron_model = neuron.ParametricLIFNode
         else:
             raise NotImplementedError('Possible values implemented: IF, LIF, PLIF')
-        print(f'Using {neuron_type} neurons')
+        print(f'Using {neuron_type} neurons') if verbose else None
 
         if net_name == 'DVSG_net':
             net = myDVSGestureNet(channels = channels, output_size = n_classes,input_sizexy= size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
@@ -135,7 +135,7 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
         functional.set_step_mode(net, 'm')
         if cupy:
             functional.set_backend(net, 'cupy', instance = neuron_model)
-            print('Using cupy in backend')
+            print('Using cupy in backend') if verbose else None
     else:
         if net_name == 'DVSG_RANN':
             net = myDVSGestureRANN(output_size = n_classes,input_sizexy=size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer, softm = softm)
