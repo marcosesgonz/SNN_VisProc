@@ -281,7 +281,7 @@ def create_confusion_matrix(y_true, y_pred, categories = False, sublabels = Fals
                         plt.plot(x, y, marker=marker, markersize=marker_size,markeredgecolor='black', color='white')
 
         legend_handles = [plt.Line2D([0], [0], marker=marker, color='w',markeredgecolor='black', markerfacecolor='white', markersize = marker_size, label=subcategory) for subcategory, marker in subcategory_markers.items()]
-        plt.legend(handles=legend_handles, title='Subetiquetas', bbox_to_anchor=(1.3, 1))
+        plt.legend(handles=legend_handles, title='Subetiquetas', bbox_to_anchor=(1.4, 1))
     plt.title(title)
     acc = np.mean(y_true == y_pred)
     plt.xlabel('Predicted label\n\nAccuracy %.2f'%(acc*100),fontsize=14)

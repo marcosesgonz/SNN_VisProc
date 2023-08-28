@@ -123,6 +123,9 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
         #El learning rate irá disminuyendo siguiendo un coseno según pasen las épocas. Luego vuelve a aumentar hasta llegar al valor inicial siguiendo este mismo coseno
         if ler_rate_type == 'CosAnn':
             lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs)
+        elif ler_rate_type == 'Step':
+            assert epochs/3 == int(epochs/3)
+            lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,step_size = epochs/3,gamma = 0.1)
         elif ler_rate_type == 'Const':
             lr_scheduler = None
         else: 
@@ -174,9 +177,10 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
                 
             checkpoint = {
                 'net': net.state_dict(),'optimizer': optimizer.state_dict(),
-                'lr_scheduler': lr_scheduler.state_dict(),'epoch': epoch,
-                'max_test_acc': max_test_acc
+                'epoch': epoch, 'max_test_acc': max_test_acc
             }
+            if lr_scheduler is not None:
+                checkpoint['lr_scheduler'] = lr_scheduler.state_dict()
 
             if save_max:
                 torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_max.pth'))
