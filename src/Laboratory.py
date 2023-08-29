@@ -38,7 +38,8 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     device = ("cuda" if (torch.cuda.is_available() and gpu) else 'mps' if gpu else 'cpu')
     
     transform_ = convert_to_3d_eframes if convert_to_3dframes else None
-    inchannels = 3 if convert_to_3d_eframes else 2
+    inchannels = 3 if convert_to_3dframes else 2
+    print(f'In channels: {inchannels}')
     
     relative_root = os.path.basename(inp_data)
     #Carga de datos en función del dataset que se vaya a usar
@@ -51,7 +52,7 @@ def execute_experiment_TrTstSplit(project_ref, name_experim, T = 16, splitby = '
     cupy = True if device == 'cuda' else False
     SNNmodel = not net_name.endswith('ANN')
     net = load_net(net_name = net_name, n_classes = nclasses_, size_xy = sizexy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,in_channels=inchannels,
-                    neuron_type = neuron_type, channels = channels, drop_out2d = drop_out2d, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning, avg_before_fc_resnets= avg_before_fc_resnets,
+                    neuron_type = neuron_type, channels = channels, drop_out2d = drop_out2d, resnet_pretrained = resnet_pretrained, fine_tuning = fine_tuning, avg_before_fc_resnets = avg_before_fc_resnets,
                     cupy = cupy, softm = softm, num_frames = T)
     n_params = num_trainable_params(net)
     #Registro en wandb para la monitorización
