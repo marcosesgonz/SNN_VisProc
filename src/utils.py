@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
 from Datasets import DVSAnimals, DVSDailyActions, DVSActionRecog, DVS128Gesture, MAD
-from models import myDVSGestureNet, mysew_resnet18, myDVSGestureRANN, myDVSGestureANN, myDVSGesture3DANN
+from models import myDVSGestureNet, mysew_resnet18,my_sew_sevenbnet ,myDVSGestureRANN, myDVSGestureANN, myDVSGesture3DANN
 from spikingjelly.activation_based import functional, surrogate, neuron, layer
 from data_augmentation import EventMix
 from sklearn.metrics import confusion_matrix
@@ -99,19 +99,19 @@ def loading_data(input_data,time_step = 16 ,datatype = 'frame', splitmeth = 'num
         return train_set,test_set,num_classes,size_xy
     
     else:
-        if relative_root == 'MAD_dataset':   #En verdad, es equivalente usar ConcatDataset o llamar de nuevo a la función MAD sin especificar 'test_subj_id'
+        if relative_root == 'MAD_dataset':   #En verdad, es equivalente usar ConcatDataset o llamar de nuevo a la función MAD sin especificar 'set'
             data_set = MAD(root = input_data, data_type = datatype, frames_number = time_step,
-                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor)
+                        split_by = splitmeth, factor_tau = tau_factor, scale_factor = scale_factor, transform = transform)
             return data_set, num_classes, size_xy
         else:
             return ConcatDataset([train_set,test_set]), num_classes, size_xy
 
 
-def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, drop_out2d = None, verbose = True,
-              noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, channels = 128, resnet_pretrained = False, fine_tuning = False):
+def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = 'LIF' ,cupy: bool = False, num_frames: int = 16, drop_out2d = None, verbose = True,in_channels = 2,
+              noutp_per_class = 10, nneurons_linear_layer = 512, softm: bool = False, channels = 128, resnet_pretrained = False, fine_tuning = False, avg_before_fc_resnets= True):
 
-    possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN']
-    assert (net_name in possible_nets), 'Unknown arquitecture. Could check posible names.'
+    possible_nets = ['DVSG_net','resnet18','DVSG_RANN','DVSG_ANN', 'DVSG_3DANN','7bnet']
+    assert (net_name in possible_nets), f'Unknown arquitecture. Posible names:{possible_nets}.'
 
     if not net_name.endswith('ANN'):
         if neuron_type == 'IF':
@@ -128,8 +128,11 @@ def load_net(net_name: str, n_classes: int, size_xy: tuple, neuron_type: str = '
             net = myDVSGestureNet(channels = channels, output_size = n_classes,input_sizexy= size_xy, noutp_per_class = noutp_per_class, nneurons_linear_layer = nneurons_linear_layer,
                                    drop_out2d = drop_out2d,spiking_neuron = neuron_model, surrogate_function=surrogate.ATan(), detach_reset=True)
         elif net_name == 'resnet18':
-            net = mysew_resnet18(pretrained = resnet_pretrained, fine_tuning = fine_tuning, spiking_neuron = neuron_model, num_classes = n_classes, 
+            net = mysew_resnet18(pretrained = resnet_pretrained, fine_tuning = fine_tuning, spiking_neuron = neuron_model, num_classes = n_classes, avg_before_fc = avg_before_fc_resnets, in_channels= in_channels,
                                  surrogate_function = surrogate.ATan(), detach_reset = True, cnf = 'ADD', zero_init_residual = True)
+        elif net_name =='7bnet':
+            net = my_sew_sevenbnet(spiking_neuron = neuron_model, num_classes = n_classes,input_sizexy= size_xy, avg_before_fc = avg_before_fc_resnets,in_channels = in_channels,
+                                   surrogate_function = surrogate.ATan(), detach_reset = True, cnf = 'ADD',zero_init_residual = True)
 
         #Establecemos las neuronas en modo multipaso
         functional.set_step_mode(net, 'm')

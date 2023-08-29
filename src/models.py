@@ -226,16 +226,15 @@ class myDVSGesture3DANN(nn.Module):
 
 
 
-#I've changed the input channels of the first conv layer from 3 to 2.
 class mySEWResNet(nn.Module):
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
-                 groups=1, width_per_group=64, replace_stride_with_dilation=None,
+    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,avg_before_fc = False,
+                 groups=1, width_per_group=64, replace_stride_with_dilation=None, in_channels = 3,
                  norm_layer=None, cnf: str = None, spiking_neuron: callable = None, **kwargs):
         super().__init__()
         if norm_layer is None:
             norm_layer = layer.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.avg_before_fc = avg_before_fc
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -247,7 +246,7 @@ class mySEWResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = layer.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,   #Here I change from 3 to 2 channels in the input channels.
+        self.conv1 = layer.Conv2d(in_channels, self.inplanes, kernel_size=7, stride=2, padding=3,   
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.sn1 = spiking_neuron(**deepcopy(kwargs))
@@ -303,7 +302,7 @@ class mySEWResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x):
+    def forward(self, x):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
@@ -314,25 +313,25 @@ class mySEWResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-
         x = self.avgpool(x)
+
         if self.avgpool.step_mode == 's':
             x = torch.flatten(x, 1)
         elif self.avgpool.step_mode == 'm':
             x = torch.flatten(x, 2)
-        
-        x = self.fc(x)
+
+        if self.avg_before_fc:
+            x = self.fc(x.mean(0))
+        else:
+            x = self.fc(x).mean(0)
         return x
 
-    def forward(self, x):
-        x = self._forward_impl(x)
-        x = x.mean(0)
-        return x
 
 
-def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, num_classes, fine_tuning = True, **kwargs):
+def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron, num_classes, fine_tuning, avg_before_fc,in_channels, **kwargs):
     
     if pretrained:
+        assert in_channels==3
         model = mySEWResNet(block, layers, cnf=cnf,num_classes = 1000, spiking_neuron=spiking_neuron, **kwargs)
         state_dict = sewr.load_state_dict_from_url(sewr.model_urls[arch],
                                               progress=progress)
@@ -353,11 +352,11 @@ def _mysew_resnet(arch, block, layers, pretrained, progress, cnf, spiking_neuron
             model.fc = layer.Linear(in_features, num_classes)
 
     else:
-        model = mySEWResNet(block, layers, cnf = cnf, num_classes = num_classes, spiking_neuron = spiking_neuron, **kwargs)
+        model = mySEWResNet(block, layers, cnf = cnf, num_classes = num_classes, spiking_neuron = spiking_neuron,avg_before_fc = avg_before_fc, in_channels = in_channels, **kwargs)
     return model
 
 
-def mysew_resnet18(pretrained=False,fine_tuning = False, progress=True, cnf: str = None, num_classes:int = 1000, spiking_neuron: callable=None, **kwargs):
+def mysew_resnet18(pretrained=False,fine_tuning = False, progress=True, cnf: str = None, in_channels:int = 2,num_classes:int = 1000, spiking_neuron: callable=None, avg_before_fc:bool = True, **kwargs):
     """
     :param pretrained: If True, the SNN will load parameters from the ANN pre-trained on ImageNet
     :type pretrained: bool
@@ -377,7 +376,116 @@ def mysew_resnet18(pretrained=False,fine_tuning = False, progress=True, cnf: str
     The spike-element-wise ResNet-18 `"Deep Residual Learning in Spiking Neural Networks" <https://arxiv.org/abs/2102.04159>`_ modified by the ResNet-18 model from `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
     """
 
-    return _mysew_resnet('resnet18', sewr.BasicBlock, [2, 2, 2, 2], pretrained, progress, cnf, spiking_neuron, num_classes= num_classes, fine_tuning = fine_tuning, **kwargs)
+    return _mysew_resnet('resnet18', sewr.BasicBlock, [2, 2, 2, 2], pretrained, progress, cnf, spiking_neuron, num_classes= num_classes, fine_tuning = fine_tuning,in_channels = in_channels, avg_before_fc = avg_before_fc, **kwargs)
+
+
+class mySEVENBnet(nn.Module):
+    def __init__(self, block, num_classes=1000, zero_init_residual=False,in_channels = 2,
+                 groups=1, width_per_group=64, replace_stride_with_dilation=None,avg_before_fc = True,
+                 norm_layer=None, cnf: str = None, spiking_neuron: callable = None, input_sizexy =(128,128), **kwargs):
+        super().__init__()
+        if norm_layer is None:
+            norm_layer = layer.BatchNorm2d
+        self._norm_layer = norm_layer
+        self.avg_before_fc = avg_before_fc
+        num_blocks = 1
+        self.inplanes = 32
+        self.dilation = 1
+        if replace_stride_with_dilation is None:
+            # each element in the tuple indicates if we should replace
+            # the 2x2 stride with a dilated convolution instead
+            replace_stride_with_dilation = [False, False, False]
+        if len(replace_stride_with_dilation) != 3:
+            raise ValueError("replace_stride_with_dilation should be None "
+                             "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
+        self.groups = groups
+        self.base_width = width_per_group
+        self.conv1 = layer.Conv2d(in_channels, self.inplanes, kernel_size=3, stride=1, padding=1,   
+                               bias=False)
+        self.bn1 = norm_layer(self.inplanes)
+        self.sn1 = spiking_neuron(**deepcopy(kwargs))
+        self.layer1 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer2 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer3 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer4 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer5 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer6 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+        self.layer7 = self._make_layer(block, self.inplanes, num_blocks, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs)
+
+        outp_x = input_sizexy[0] // (2**7)
+        outp_y = input_sizexy[1] // (2**7)
+        self.flatten = layer.Flatten()
+        self.fc = layer.Linear(outp_x * outp_y * self.inplanes * block.expansion, num_classes, bias = True)
+
+        for m in self.modules():
+            if isinstance(m, layer.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (layer.BatchNorm2d, layer.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+        # Zero-initialize the last BN in each residual branch,
+        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
+        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        if zero_init_residual:
+            for m in self.modules():
+                if isinstance(m, sewr.Bottleneck):
+                    nn.init.constant_(m.bn3.weight, 0)
+                elif isinstance(m, sewr.BasicBlock):
+                    nn.init.constant_(m.bn2.weight, 0)
+
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False, cnf: str=None, spiking_neuron: callable = None, **kwargs):
+        norm_layer = self._norm_layer
+        downsample = None
+        previous_dilation = self.dilation
+        if dilate:
+            self.dilation *= stride
+            stride = 1
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                sewr.conv1x1(self.inplanes, planes * block.expansion, stride),
+                norm_layer(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
+                            self.base_width, previous_dilation, norm_layer, cnf, spiking_neuron, **kwargs))
+        layers.append(layer.MaxPool2d(2, 2))
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(block(self.inplanes, planes, groups=self.groups,
+                                base_width=self.base_width, dilation=self.dilation,
+                                norm_layer=norm_layer, cnf=cnf, spiking_neuron=spiking_neuron, **kwargs))
+            layers.append(layer.MaxPool2d(2, 2))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):  #x.shape = (T, N, C, H, W)
+        # See note [TorchScript super()]
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.sn1(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = self.layer6(x)
+        x = self.layer7(x)
+        x = self.flatten(x)
+        if self.avg_before_fc:
+            x = self.fc(x.mean(0))
+        else:
+            x = self.fc(x).mean(0)
+        return x
+
+
+def my_sew_sevenbnet(cnf: str = None, input_sizexy: tuple = (128, 128),in_channels:int = 2, num_classes: int = 1000, spiking_neuron: callable = None, avg_before_fc:bool = True, **kwargs):
+    """
+    """
+    return mySEVENBnet(block = sewr.BasicBlock, num_classes = num_classes, cnf = cnf,in_channels = in_channels, spiking_neuron = spiking_neuron, input_sizexy = input_sizexy,avg_before_fc = avg_before_fc, **kwargs)
+
 
 
 from spikingjelly.clock_driven.neuron import MultiStepLIFNode
