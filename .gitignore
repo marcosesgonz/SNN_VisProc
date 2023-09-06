@@ -1,6 +1,9 @@
+src/Exec*
 spikingjelly_alias
 *.png
 *.csv
+*.pdf
+*.rtf
 *.aedat
 *.npz
 *.npy
@@ -22,3 +25,7 @@ src/gifs_*
 src/my_rpg_e2vid/pretrained/*.tar
 src/*.gif
 src/.vscode/
+logs
+outputs
+papers
+tutoriales

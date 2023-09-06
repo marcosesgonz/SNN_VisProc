@@ -392,7 +392,6 @@ def infer_data(net_name,data,checkpoint_file,frames_num,noutp_per_class = 10, nn
     all_labels = []
     with torch.no_grad():
         for i,(frame, label) in enumerate(val_data_loader):
-            #print(label)
             frame = frame.to(device)
             if SNNmodel:
                 frame = frame.transpose(0, 1)  # [N, T, C, H, W] -> [T, N, C, H, W]
