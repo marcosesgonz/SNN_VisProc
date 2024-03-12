@@ -1,6 +1,0 @@
-Instancias de train:  1176
-Instancias de test:  288
-Mkdir /Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/Projects/result_logs/DVS_Gesture_dataset/T16_b8_lr0.1.
-/Users/marcosesquivelgonzalez/Desktop/MasterCDatos/TFM/Projects/result_logs/DVS_Gesture_dataset/T16_b8_lr0.1
-epoch = 0, train_loss = 0.0909, train_acc = 0.0825, test_loss = 0.0909, test_acc = 0.0833, max_test_acc = 0.0833
-train speed = 3.8811 images/s, test speed = 7.8287 images/s
